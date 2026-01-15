@@ -49,20 +49,22 @@ builds:
 
 archives:
   - id: darwin-arm64
-    builds:
+    ids:
       - amanmcp-darwin-arm64
     name_template: "{{ .ProjectName }}_{{ .Version }}_darwin_arm64"
-    format: tar.gz
+    formats:
+      - tar.gz
     files:
       - LICENSE
       - README.md
 
-  # Note: amd64 archive disabled for v1.0
+  # Note: amd64 archive disabled for v1.0 - requires cross-compilation setup
   # - id: darwin-amd64
-  #   builds:
+  #   ids:
   #     - amanmcp-darwin-amd64
   #   name_template: "{{ .ProjectName }}_{{ .Version }}_darwin_amd64"
-  #   format: tar.gz
+  #   formats:
+  #     - tar.gz
   #   files:
   #     - LICENSE
   #     - README.md
@@ -109,8 +111,8 @@ release:
 
     ### Homebrew (macOS) - Recommended
     ```bash
-    brew tap Aman-CERP/tap
-    brew install amanmcp
+    brew tap Aman-CERP/amanmcp
+    brew install --cask amanmcp
     ```
 
     ### Universal Install Script (macOS & Linux)
@@ -131,23 +133,22 @@ release:
     amanmcp version
     ```
 
-brews:
+homebrew_casks:
   - repository:
       owner: Aman-CERP
       name: homebrew-amanmcp
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    directory: Formula
+    # Casks use Casks/ directory by default
     homepage: "https://github.com/Aman-CERP/amanmcp"
     description: "Local-first RAG MCP server for AI coding assistants"
-    license: "Apache-2.0"
-    install: |
-      bin.install "amanmcp"
+    license: "MIT"
+    # Handle unsigned binaries on macOS
+    post_install: |
+      system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", staged_path]
     caveats: |
       To get started:
         cd your-project
         amanmcp
-    test: |
-      system "#{bin}/amanmcp", "version"
 
 # Announce to dev/marketing channels (commented out for now)
 # announce:
