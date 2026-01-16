@@ -21,7 +21,7 @@
 |-----------|------------|---------|
 | MCP Server | Official Go SDK | Claude Code integration |
 | Code Parsing | tree-sitter | AST-aware chunking |
-| Keyword Search | Bleve BM25 | Exact term matching |
+| Keyword Search | SQLite FTS5 BM25 | Exact term matching |
 | Vector Search | coder/hnsw | Semantic similarity |
 | Embeddings | Ollama (or Static768 fallback) | Text → vectors |
 | Metadata | SQLite | File and chunk info |
@@ -191,7 +191,7 @@ amanmcp/
 ├── Makefile                     # Development commands
 ├── go.mod
 ├── go.sum
-├── LICENSE                      # MIT License
+├── LICENSE                      # Apache 2.0 License
 └── README.md                    # User documentation
 ```
 
@@ -492,7 +492,7 @@ graph TD
 .amanmcp/
 ├── vectors.hnsw             # coder/hnsw HNSW index (GOB encoded)
 ├── vectors.hnsw.meta        # Vector ID mappings (GOB encoded)
-├── bm25.bleve/              # Bleve BM25 index directory
+├── bm25.db                  # SQLite FTS5 BM25 index
 ├── metadata.db              # SQLite metadata (chunks, files, symbols)
 └── config.yaml              # Project-specific config (if any)
 ```

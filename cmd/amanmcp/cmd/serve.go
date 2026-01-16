@@ -216,7 +216,7 @@ func runServe(ctx context.Context, transport string, port int) (err error) {
 	if err := pidFile.Write(); err != nil {
 		return fmt.Errorf("failed to write PID file: %w", err)
 	}
-	defer pidFile.Remove()
+	defer func() { _ = pidFile.Remove() }()
 	slog.Debug("PID file written", slog.String("path", pidFile.Path()), slog.Int("pid", os.Getpid()))
 
 	// Check if index exists
@@ -660,7 +660,7 @@ func runServeWithSession(ctx context.Context, sessionName, projectPath, transpor
 	if err := pidFile.Write(); err != nil {
 		return fmt.Errorf("failed to write PID file: %w", err)
 	}
-	defer pidFile.Remove()
+	defer func() { _ = pidFile.Remove() }()
 	slog.Debug("PID file written (session mode)",
 		slog.String("path", pidFile.Path()),
 		slog.Int("pid", os.Getpid()),

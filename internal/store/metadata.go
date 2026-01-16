@@ -1261,7 +1261,7 @@ func (s *SQLiteStore) SaveIndexCheckpoint(ctx context.Context, stage string, tot
 	if err != nil {
 		return fmt.Errorf("begin checkpoint transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	now := time.Now()
 	query := `INSERT INTO state (key, value, updated_at) VALUES (?, ?, ?)
@@ -1335,7 +1335,7 @@ func (s *SQLiteStore) ClearIndexCheckpoint(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("begin clear checkpoint transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	keys := []string{
 		StateKeyCheckpointStage,

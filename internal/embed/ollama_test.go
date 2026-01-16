@@ -274,7 +274,7 @@ func TestOllamaEmbedder_ServerReturns500_ReturnsError(t *testing.T) {
 		if r.URL.Path == "/api/embed" {
 			embedCalled = true
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("internal error"))
+			_, _ = w.Write([]byte("internal error"))
 			return
 		}
 	}))
@@ -642,7 +642,7 @@ func TestOllamaEmbedder_EmbedBatch_UsesNativeBatchAPI(t *testing.T) {
 		if r.URL.Path == "/api/embed" {
 			body, _ := io.ReadAll(r.Body)
 			var req map[string]any
-			json.Unmarshal(body, &req)
+			_ = json.Unmarshal(body, &req)
 
 			// Check if input is an array (batch)
 			if input, ok := req["input"].([]any); ok && len(input) > 1 {
@@ -807,7 +807,7 @@ func mockOllamaServer(t *testing.T, dims int, customHandler func(w http.Response
 		if r.URL.Path == "/api/embed" {
 			body, _ := io.ReadAll(r.Body)
 			var req map[string]any
-			json.Unmarshal(body, &req)
+			_ = json.Unmarshal(body, &req)
 
 			// Determine number of embeddings to return
 			count := 1

@@ -1,8 +1,10 @@
 # Technology Validation Report
 
 > **Date**: 2026-01-04
-> **Status**: Validated
+> **Status**: Historical (BM25 backend changed to SQLite FTS5 on 2026-01-14)
 > **Methodology**: Grounded research from 20+ industry sources (2025-2026)
+>
+> **⚠️ UPDATE:** The BM25 backend was migrated from Bleve to SQLite FTS5 to solve concurrent access issues. SQLite FTS5 with WAL mode enables multiple concurrent readers and non-blocking writes.
 
 ---
 
@@ -15,7 +17,7 @@ This document validates amanmcp's technology choices against current industry be
 | Embedding Backend | Ollama | Optimal |
 | Embedding Model | Qwen3-embedding | Optimal |
 | Vector Store | coder/hnsw (Pure Go) | Optimal |
-| BM25 Index | Bleve | Optimal |
+| BM25 Index | ~~Bleve~~ → **SQLite FTS5** | Migrated (2026-01-14) |
 | Code Parsing | tree-sitter | Industry Best Practice |
 | Fusion Strategy | RRF (k=60) | Production Standard |
 | Language | Go | Aligned with MCP ecosystem |

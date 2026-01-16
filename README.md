@@ -3,7 +3,7 @@
 **Local RAG for your codebase. Zero config. Privacy-first.**
 
 [![Version](https://img.shields.io/badge/version-0.10.2-green)](https://github.com/Aman-CERP/amanmcp/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go](https://img.shields.io/badge/Go-1.25.5+-00ADD8?logo=go)](https://golang.org/)
 
 ---
@@ -137,7 +137,7 @@ When connected via MCP, Claude has these tools:
 |-----------|--------|
 | Language | Go 1.25.5+ |
 | Protocol | [MCP 2025-11-25](https://modelcontextprotocol.io/) |
-| Keyword Search | [Bleve](https://blevesearch.com/) BM25 |
+| Keyword Search | SQLite FTS5 BM25 (pure Go) |
 | Vector Search | [coder/hnsw](https://github.com/coder/hnsw) |
 | Code Parsing | [tree-sitter](https://tree-sitter.github.io/) |
 | Embeddings | [Ollama](https://ollama.com/) (default) / MLX (Apple Silicon) |
@@ -154,7 +154,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE)
+Apache 2.0 License - see [LICENSE](LICENSE)
 
 ---
 

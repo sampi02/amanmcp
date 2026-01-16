@@ -197,7 +197,7 @@ func (d *Daemon) Start(ctx context.Context) error {
 	if err := d.pidFile.Write(); err != nil {
 		return fmt.Errorf("failed to write PID file: %w", err)
 	}
-	defer d.pidFile.Remove()
+	defer func() { _ = d.pidFile.Remove() }()
 
 	// Create server
 	server, err := NewServer(d.config.SocketPath)

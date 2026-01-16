@@ -22,14 +22,14 @@ func TestNewMLXEmbedder(t *testing.T) {
 		switch r.URL.Path {
 		case "/health":
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"status":       "healthy",
 				"model_status": "ready",
 				"loaded_model": "large",
 	})
 		case "/models":
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"models": map[string]interface{}{
 					"small":  map[string]int{"dimensions": 1024},
 					"medium": map[string]int{"dimensions": 2560},
@@ -71,7 +71,7 @@ func TestMLXEmbedder_Embed(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/health":
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"status":       "healthy",
 				"model_status": "ready",
 				"loaded_model": "large",
@@ -126,7 +126,7 @@ func TestMLXEmbedder_EmbedBatch(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/health":
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"status":       "healthy",
 				"model_status": "ready",
 				"loaded_model": "large",
@@ -140,7 +140,7 @@ func TestMLXEmbedder_EmbedBatch(t *testing.T) {
 		case "/embed_batch":
 			// Decode request to get number of texts
 			var req map[string]interface{}
-			json.NewDecoder(r.Body).Decode(&req)
+			_ = json.NewDecoder(r.Body).Decode(&req)
 			texts := req["texts"].([]interface{})
 
 			// Return embeddings for each text
@@ -487,7 +487,7 @@ func TestMLXEmbedder_RetryOnTimeout(t *testing.T) {
 			}
 			// Second attempt succeeds
 			var req map[string]interface{}
-			json.NewDecoder(r.Body).Decode(&req)
+			_ = json.NewDecoder(r.Body).Decode(&req)
 			texts := req["texts"].([]interface{})
 			embeddings := make([][]float64, len(texts))
 			for i := range embeddings {

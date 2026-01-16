@@ -2157,7 +2157,7 @@ func TestEngine_RerankResults_Integration(t *testing.T) {
 		chunk2 := &store.Chunk{ID: "chunk2", Content: "func Logout() {}", FilePath: "auth.go", ContentType: store.ContentTypeCode}
 		chunk3 := &store.Chunk{ID: "chunk3", Content: "func Register() {}", FilePath: "user.go", ContentType: store.ContentTypeCode}
 
-		metadata.SaveChunks(context.Background(), []*store.Chunk{chunk1, chunk2, chunk3})
+		_ = metadata.SaveChunks(context.Background(), []*store.Chunk{chunk1, chunk2, chunk3})
 
 		bm25.SearchFn = func(ctx context.Context, query string, limit int) ([]*store.BM25Result, error) {
 			return []*store.BM25Result{
@@ -2217,7 +2217,7 @@ func TestEngine_RerankResults_Integration(t *testing.T) {
 		engine, bm25, vector, embedder, metadata := setupTestEngine(t)
 
 		chunk1 := &store.Chunk{ID: "chunk1", Content: "content1", FilePath: "a.go", ContentType: store.ContentTypeCode}
-		metadata.SaveChunks(context.Background(), []*store.Chunk{chunk1})
+		_ = metadata.SaveChunks(context.Background(), []*store.Chunk{chunk1})
 
 		bm25.SearchFn = func(ctx context.Context, query string, limit int) ([]*store.BM25Result, error) {
 			return []*store.BM25Result{{DocID: "chunk1", Score: 0.9}}, nil
@@ -2251,7 +2251,7 @@ func TestEngine_RerankResults_Integration(t *testing.T) {
 
 		chunk1 := &store.Chunk{ID: "chunk1", Content: "content1", FilePath: "a.go", ContentType: store.ContentTypeCode}
 		chunk2 := &store.Chunk{ID: "chunk2", Content: "content2", FilePath: "b.go", ContentType: store.ContentTypeCode}
-		metadata.SaveChunks(context.Background(), []*store.Chunk{chunk1, chunk2})
+		_ = metadata.SaveChunks(context.Background(), []*store.Chunk{chunk1, chunk2})
 
 		bm25.SearchFn = func(ctx context.Context, query string, limit int) ([]*store.BM25Result, error) {
 			return []*store.BM25Result{
@@ -2293,7 +2293,7 @@ func TestEngine_RerankResults_Integration(t *testing.T) {
 		engine, bm25, vector, embedder, metadata := setupTestEngine(t)
 
 		chunk1 := &store.Chunk{ID: "chunk1", Content: "content1", FilePath: "a.go", ContentType: store.ContentTypeCode}
-		metadata.SaveChunks(context.Background(), []*store.Chunk{chunk1})
+		_ = metadata.SaveChunks(context.Background(), []*store.Chunk{chunk1})
 
 		bm25.SearchFn = func(ctx context.Context, query string, limit int) ([]*store.BM25Result, error) {
 			return []*store.BM25Result{{DocID: "chunk1", Score: 0.9}}, nil
@@ -2320,7 +2320,7 @@ func TestEngine_RerankResults_Integration(t *testing.T) {
 		engine, bm25, vector, embedder, metadata := setupTestEngine(t)
 
 		chunk1 := &store.Chunk{ID: "chunk1", Content: "content1", FilePath: "a.go", ContentType: store.ContentTypeCode}
-		metadata.SaveChunks(context.Background(), []*store.Chunk{chunk1})
+		_ = metadata.SaveChunks(context.Background(), []*store.Chunk{chunk1})
 
 		bm25.SearchFn = func(ctx context.Context, query string, limit int) ([]*store.BM25Result, error) {
 			return []*store.BM25Result{{DocID: "chunk1", Score: 0.9}}, nil
@@ -2350,7 +2350,7 @@ func TestEngine_RerankResults_Integration(t *testing.T) {
 
 		chunk1 := &store.Chunk{ID: "chunk1", Content: "content1", FilePath: "a.go", ContentType: store.ContentTypeCode}
 		chunk2 := &store.Chunk{ID: "chunk2", Content: "content2", FilePath: "b.go", ContentType: store.ContentTypeCode}
-		metadata.SaveChunks(context.Background(), []*store.Chunk{chunk1, chunk2})
+		_ = metadata.SaveChunks(context.Background(), []*store.Chunk{chunk1, chunk2})
 
 		bm25.SearchFn = func(ctx context.Context, query string, limit int) ([]*store.BM25Result, error) {
 			return []*store.BM25Result{

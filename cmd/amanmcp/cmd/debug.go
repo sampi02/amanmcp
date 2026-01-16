@@ -183,7 +183,7 @@ func collectDebugInfo(ctx context.Context, root, dataDir string) (*DebugInfo, er
 
 	// Get stored embedder dimensions from metadata state
 	if dimStr, err := metadata.GetState(ctx, store.StateKeyIndexDimension); err == nil && dimStr != "" {
-		fmt.Sscanf(dimStr, "%d", &info.EmbedderDimensions)
+		_, _ = fmt.Sscanf(dimStr, "%d", &info.EmbedderDimensions)
 	}
 
 	// Check embedder availability (simplified - check if model is set)

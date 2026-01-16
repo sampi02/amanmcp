@@ -750,7 +750,7 @@ USER DATA (global):
 PROJECT DATA (per-project):
 <project>/.amanmcp/
 ├── metadata.db                     # SQLite metadata
-├── bm25.bleve/                     # BM25 keyword index
+├── bm25.db                         # SQLite FTS5 BM25 index
 └── vectors.hnsw                    # Vector embeddings (coder/hnsw)
 ```
 
