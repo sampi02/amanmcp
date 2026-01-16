@@ -56,79 +56,75 @@ AmanMCP follows the **"It Just Works"** philosophy, inspired by Apple's design p
 
 ### 1.2 High-Level Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                              CLIENT LAYER                                     │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────────┐  │
-│  │   Claude Code   │  │     Cursor      │  │   Other MCP Clients         │  │
-│  └────────┬────────┘  └────────┬────────┘  └──────────────┬──────────────┘  │
-│           │                    │                          │                  │
-│           └────────────────────┴──────────────────────────┘                  │
-│                                │                                              │
-│                         MCP Protocol (stdio/SSE)                             │
-└────────────────────────────────┼─────────────────────────────────────────────┘
-                                 │
-┌────────────────────────────────┼─────────────────────────────────────────────┐
-│                                ▼                                              │
-│  ┌─────────────────────────────────────────────────────────────────────────┐ │
-│  │                        MCP SERVER LAYER                                  │ │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐  │ │
-│  │  │   Protocol   │  │    Tool      │  │   Resource   │  │  Notifier   │  │ │
-│  │  │   Handler    │  │   Router     │  │   Provider   │  │   (Events)  │  │ │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘  └─────────────┘  │ │
-│  └─────────────────────────────────────────────────────────────────────────┘ │
-│                                │                                              │
-│  ┌─────────────────────────────┼───────────────────────────────────────────┐ │
-│  │                        CORE ENGINE                                       │ │
-│  │  ┌──────────────────────────▼──────────────────────────────────────────┐│ │
-│  │  │                    SEARCH ENGINE                                     ││ │
-│  │  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────────────┐   ││ │
-│  │  │  │  Query Parser │→ │ Query Router  │→ │   Result Aggregator   │   ││ │
-│  │  │  └───────────────┘  └───────┬───────┘  └───────────▲───────────┘   ││ │
-│  │  │                             │                       │               ││ │
-│  │  │              ┌──────────────┴──────────────┐       │               ││ │
-│  │  │              ▼                              ▼       │               ││ │
-│  │  │  ┌───────────────────┐        ┌───────────────────┐│               ││ │
-│  │  │  │   BM25 Searcher   │        │  Vector Searcher  ││               ││ │
-│  │  │  │   (Keyword)       │        │  (Semantic)       │┘               ││ │
-│  │  │  └─────────┬─────────┘        └─────────┬─────────┘                ││ │
-│  │  │            │                            │                           ││ │
-│  │  │            └────────────┬───────────────┘                           ││ │
-│  │  │                         ▼                                           ││ │
-│  │  │            ┌─────────────────────────┐                              ││ │
-│  │  │            │    Score Fusion (RRF)   │                              ││ │
-│  │  │            └─────────────────────────┘                              ││ │
-│  │  └─────────────────────────────────────────────────────────────────────┘│ │
-│  │                                                                          │ │
-│  │  ┌─────────────────────────────────────────────────────────────────────┐│ │
-│  │  │                       INDEXER                                        ││ │
-│  │  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌──────────────┐  ││ │
-│  │  │  │  Scanner   │→ │  Chunker   │→ │  Embedder  │→ │   Persister  │  ││ │
-│  │  │  │(Discovery) │  │(tree-sitter)  │(Ollama)    │  │  (Storage)   │  ││ │
-│  │  │  └────────────┘  └────────────┘  └────────────┘  └──────────────┘  ││ │
-│  │  └─────────────────────────────────────────────────────────────────────┘│ │
-│  │                                                                          │ │
-│  │  ┌─────────────────────────────────────────────────────────────────────┐│ │
-│  │  │                       WATCHER                                        ││ │
-│  │  │  ┌────────────┐  ┌────────────┐  ┌────────────┐                     ││ │
-│  │  │  │  fsnotify  │→ │  Debouncer │→ │ Diff Queue │→ Indexer            ││ │
-│  │  │  └────────────┘  └────────────┘  └────────────┘                     ││ │
-│  │  └─────────────────────────────────────────────────────────────────────┘│ │
-│  └─────────────────────────────────────────────────────────────────────────┘ │
-│                                │                                              │
-│  ┌─────────────────────────────┼───────────────────────────────────────────┐ │
-│  │                       STORAGE LAYER                                      │ │
-│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────┐  │ │
-│  │  │  coder/hnsw     │  │   BM25 Index    │  │    Metadata Store       │  │ │
-│  │  │  (HNSW Vectors) │  │   (Inverted)    │  │    (SQLite)             │  │ │
-│  │  └─────────────────┘  └─────────────────┘  └─────────────────────────┘  │ │
-│  └─────────────────────────────────────────────────────────────────────────┘ │
-│                                │                                              │
-│                         .amanmcp/ directory                                   │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
+```mermaid
+flowchart TB
+    subgraph Clients["CLIENT LAYER"]
+        CC[Claude Code]
+        Cursor[Cursor]
+        Other[Other MCP Clients]
+    end
 
-![High-Level Architecture](./diagrams/architecture.svg)
+    subgraph MCP["MCP SERVER LAYER"]
+        Protocol[Protocol Handler]
+        Tools[Tool Router]
+        Resources[Resource Provider]
+        Notifier[Event Notifier]
+    end
+
+    subgraph Core["CORE ENGINE"]
+        subgraph Search["SEARCH ENGINE"]
+            Parser[Query Parser]
+            Router[Query Router]
+            BM25[BM25 Searcher<br/>Keyword]
+            Vector[Vector Searcher<br/>Semantic]
+            RRF[Score Fusion<br/>RRF k=60]
+            Aggregator[Result Aggregator]
+        end
+
+        subgraph Index["INDEXER"]
+            Scanner[Scanner<br/>Discovery]
+            Chunker[Chunker<br/>tree-sitter]
+            Embedder[Embedder<br/>Ollama/MLX]
+            Persister[Persister<br/>Storage]
+        end
+
+        subgraph Watch["WATCHER"]
+            FSNotify[fsnotify]
+            Debouncer[Debouncer]
+            DiffQueue[Diff Queue]
+        end
+    end
+
+    subgraph Storage["STORAGE LAYER"]
+        HNSW[(coder/hnsw<br/>HNSW Vectors)]
+        BM25Index[(BM25 Index<br/>Inverted)]
+        Metadata[(SQLite<br/>Metadata)]
+    end
+
+    Clients -->|MCP Protocol<br/>stdio/SSE| MCP
+    MCP --> Core
+
+    Parser --> Router
+    Router --> BM25
+    Router --> Vector
+    BM25 --> RRF
+    Vector --> RRF
+    RRF --> Aggregator
+
+    Scanner --> Chunker --> Embedder --> Persister
+
+    FSNotify --> Debouncer --> DiffQueue --> Scanner
+
+    Persister --> Storage
+    Search --> Storage
+
+    style Clients fill:#3498db,color:#fff
+    style MCP fill:#9b59b6,color:#fff
+    style Search fill:#27ae60,color:#fff
+    style Index fill:#e67e22,color:#fff
+    style Watch fill:#f39c12,color:#fff
+    style Storage fill:#34495e,color:#fff
+```
 
 ---
 
@@ -201,11 +197,73 @@ amanmcp/
 
 ### 2.2 Component Interactions
 
-![Search Request Flow](./diagrams/sequence-search.svg)
+```mermaid
+sequenceDiagram
+    participant Client as Claude Code
+    participant MCP as MCP Server
+    participant Engine as Search Engine
+    participant BM25 as BM25 Index
+    participant Vec as Vector Index
+    participant Embed as Embedder
+
+    Client->>MCP: search("authentication middleware")
+    MCP->>Engine: Search(query, opts)
+
+    par Parallel Search
+        Engine->>BM25: Search(tokens)
+        BM25-->>Engine: keyword_results[]
+    and
+        Engine->>Embed: Embed(query)
+        Embed-->>Engine: query_vector
+        Engine->>Vec: Search(query_vector, k=50)
+        Vec-->>Engine: semantic_results[]
+    end
+
+    Engine->>Engine: RRF Fusion(keyword, semantic)
+    Engine-->>MCP: ranked_results[]
+    MCP-->>Client: SearchResult JSON
+```
 
 ### 2.3 Indexing Pipeline
 
-![Indexing Pipeline](./diagrams/indexing-pipeline.svg)
+```mermaid
+flowchart LR
+    subgraph Discovery["1. DISCOVERY"]
+        Files[Source Files]
+        Gitignore[.gitignore filter]
+        Scanner[File Scanner]
+    end
+
+    subgraph Parsing["2. PARSING"]
+        TS[tree-sitter]
+        AST[AST Analysis]
+        Chunks[Code Chunks]
+    end
+
+    subgraph Embedding["3. EMBEDDING"]
+        Batch[Batch Processing]
+        Ollama[Ollama API]
+        Vectors[768-dim Vectors]
+    end
+
+    subgraph Storage["4. STORAGE"]
+        HNSW[(HNSW Index)]
+        BM25[(BM25 Index)]
+        Meta[(SQLite)]
+    end
+
+    Files --> Gitignore --> Scanner
+    Scanner --> TS --> AST --> Chunks
+    Chunks --> Batch --> Ollama --> Vectors
+    Vectors --> HNSW
+    Chunks --> BM25
+    Chunks --> Meta
+
+    style Discovery fill:#3498db,color:#fff
+    style Parsing fill:#9b59b6,color:#fff
+    style Embedding fill:#e67e22,color:#fff
+    style Storage fill:#27ae60,color:#fff
+```
 
 ---
 
@@ -213,41 +271,66 @@ amanmcp/
 
 ### 3.1 Query Classification
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    QUERY CLASSIFICATION                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Query: "useEffect cleanup function"                            │
-│                                                                  │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  Step 1: Pattern Detection                                  │ │
-│  │  ├─ Has camelCase: YES (useEffect)                         │ │
-│  │  ├─ Has error code pattern: NO                              │ │
-│  │  ├─ Is natural language: MIXED                              │ │
-│  │  └─ Has special chars: NO                                   │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                          ▼                                       │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  Step 2: Weight Assignment                                  │ │
-│  │  ├─ Technical term detected: boost BM25                    │ │
-│  │  ├─ Natural language present: keep semantic                 │ │
-│  │  └─ Result: BM25=0.5, Semantic=0.5                         │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                          ▼                                       │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  Step 3: Output Classification                              │ │
-│  │  {                                                          │ │
-│  │    type: "mixed",                                           │ │
-│  │    bm25_weight: 0.5,                                        │ │
-│  │    semantic_weight: 0.5,                                    │ │
-│  │    boost_terms: ["useEffect"]                               │ │
-│  │  }                                                          │ │
-│  └────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    Query["Query: 'useEffect cleanup function'"]
+
+    subgraph Step1["Step 1: Pattern Detection"]
+        P1{Has camelCase?}
+        P2{Has error code?}
+        P3{Natural language?}
+        P4{Special chars?}
+    end
+
+    subgraph Step2["Step 2: Weight Assignment"]
+        W1[Technical term → boost BM25]
+        W2[Natural language → keep semantic]
+        W3[Result: BM25=0.5, Semantic=0.5]
+    end
+
+    subgraph Step3["Step 3: Classification Output"]
+        Output["{ type: 'mixed',<br/>bm25_weight: 0.5,<br/>semantic_weight: 0.5,<br/>boost_terms: ['useEffect'] }"]
+    end
+
+    Query --> Step1
+    P1 -->|YES| W1
+    P2 -->|NO| W2
+    P3 -->|MIXED| W2
+    P4 -->|NO| W3
+    Step2 --> Output
+
+    style Query fill:#3498db,color:#fff
+    style Step1 fill:#f39c12,color:#fff
+    style Step2 fill:#9b59b6,color:#fff
+    style Output fill:#27ae60,color:#fff
 ```
 
-![Query Classification & Search Flow](./diagrams/search-flow.svg)
+```mermaid
+flowchart LR
+    subgraph Classification["Query Classification Flow"]
+        Q[Query] --> Classify{Classify}
+
+        Classify -->|Error Code| EC["BM25: 0.8<br/>Vector: 0.2"]
+        Classify -->|camelCase| CC["BM25: 0.7<br/>Vector: 0.3"]
+        Classify -->|Natural Lang| NL["BM25: 0.25<br/>Vector: 0.75"]
+        Classify -->|Mixed| MX["BM25: 0.5<br/>Vector: 0.5"]
+        Classify -->|Quoted| QT["BM25: 0.9<br/>Vector: 0.1"]
+    end
+
+    EC --> Search
+    CC --> Search
+    NL --> Search
+    MX --> Search
+    QT --> Search
+
+    Search[Hybrid Search]
+
+    style EC fill:#e74c3c,color:#fff
+    style CC fill:#e67e22,color:#fff
+    style NL fill:#9b59b6,color:#fff
+    style MX fill:#3498db,color:#fff
+    style QT fill:#27ae60,color:#fff
+```
 
 **Classification Rules:**
 
@@ -261,111 +344,142 @@ amanmcp/
 
 ### 3.2 Reciprocal Rank Fusion (RRF)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                  RECIPROCAL RANK FUSION                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  BM25 Results:           Vector Results:                        │
-│  1. chunk_A (rank 1)     1. chunk_C (rank 1)                   │
-│  2. chunk_B (rank 2)     2. chunk_A (rank 2)                   │
-│  3. chunk_C (rank 3)     3. chunk_D (rank 3)                   │
-│  4. chunk_D (rank 4)     4. chunk_B (rank 4)                   │
-│                                                                  │
-│  RRF Formula: score(d) = Σ weight_i / (k + rank_i)              │
-│  Where k = 60 (constant to prevent extreme values)              │
-│                                                                  │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  chunk_A:                                                   │ │
-│  │    BM25: 0.35 × (1/(60+1)) = 0.00574                       │ │
-│  │    Vec:  0.65 × (1/(60+2)) = 0.01048                       │ │
-│  │    Total: 0.01622                                           │ │
-│  │                                                             │ │
-│  │  chunk_C:                                                   │ │
-│  │    BM25: 0.35 × (1/(60+3)) = 0.00556                       │ │
-│  │    Vec:  0.65 × (1/(60+1)) = 0.01066                       │ │
-│  │    Total: 0.01622                                           │ │
-│  │                                                             │ │
-│  │  chunk_B:                                                   │ │
-│  │    BM25: 0.35 × (1/(60+2)) = 0.00565                       │ │
-│  │    Vec:  0.65 × (1/(60+4)) = 0.01016                       │ │
-│  │    Total: 0.01581                                           │ │
-│  │                                                             │ │
-│  │  chunk_D:                                                   │ │
-│  │    BM25: 0.35 × (1/(60+4)) = 0.00547                       │ │
-│  │    Vec:  0.65 × (1/(60+3)) = 0.01032                       │ │
-│  │    Total: 0.01579                                           │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                  │
-│  Final Ranking: chunk_A ≈ chunk_C > chunk_B > chunk_D           │
-│  (chunk_A chosen as tie-breaker: appears in both lists)        │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph BM25["BM25 Results (weight: 0.35)"]
+        B1["1. chunk_A"]
+        B2["2. chunk_B"]
+        B3["3. chunk_C"]
+        B4["4. chunk_D"]
+    end
+
+    subgraph Vector["Vector Results (weight: 0.65)"]
+        V1["1. chunk_C"]
+        V2["2. chunk_A"]
+        V3["3. chunk_D"]
+        V4["4. chunk_B"]
+    end
+
+    subgraph RRF["RRF Formula: score(d) = Σ weight / (k + rank)"]
+        Formula["k = 60 (smoothing constant)"]
+    end
+
+    subgraph Scores["Score Calculation"]
+        SA["chunk_A: 0.00574 + 0.01048 = 0.01622"]
+        SC["chunk_C: 0.00556 + 0.01066 = 0.01622"]
+        SB["chunk_B: 0.00565 + 0.01016 = 0.01581"]
+        SD["chunk_D: 0.00547 + 0.01032 = 0.01579"]
+    end
+
+    subgraph Final["Final Ranking"]
+        R1["1. chunk_A ≈ chunk_C"]
+        R2["2. chunk_B"]
+        R3["3. chunk_D"]
+    end
+
+    BM25 --> RRF
+    Vector --> RRF
+    RRF --> Scores --> Final
+
+    style BM25 fill:#3498db,color:#fff
+    style Vector fill:#9b59b6,color:#fff
+    style RRF fill:#f39c12,color:#fff
+    style Final fill:#27ae60,color:#fff
 ```
 
-*See [search-flow.svg](./diagrams/search-flow.svg) above for the visual RRF flow.*
+```mermaid
+sequenceDiagram
+    participant Q as Query
+    participant BM25 as BM25 Search
+    participant Vec as Vector Search
+    participant RRF as RRF Fusion
+    participant Out as Output
+
+    Q->>BM25: "auth middleware"
+    Q->>Vec: embed("auth middleware")
+
+    par Parallel Execution
+        BM25-->>RRF: [A:r1, B:r2, C:r3, D:r4]
+    and
+        Vec-->>RRF: [C:r1, A:r2, D:r3, B:r4]
+    end
+
+    Note over RRF: score = Σ w/(60+rank)
+    RRF->>RRF: Calculate combined scores
+    RRF-->>Out: [A, C, B, D] ranked
+```
 
 ### 3.3 AST-Based Chunking (cAST Algorithm)
 
+```mermaid
+flowchart TB
+    subgraph Input["Input: Go Source File"]
+        Code["package main<br/>import 'fmt'<br/>type User struct {...}<br/>func (u *User) Greet() string {...}<br/>func main() {...}"]
+    end
+
+    subgraph Step1["Step 1: Parse into AST"]
+        AST["source_file"]
+        AST --> Pkg[package_clause]
+        AST --> Imp[import_declaration]
+        AST --> Type[type_declaration<br/>User struct]
+        AST --> Method[method_declaration<br/>User.Greet]
+        AST --> Func[function_declaration<br/>main]
+    end
+
+    subgraph Step2["Step 2: Extract Chunks with Context"]
+        C1["Chunk 1: User struct<br/>+ package, imports<br/>Symbols: [User: struct]"]
+        C2["Chunk 2: User.Greet<br/>+ package, imports, User ref<br/>Symbols: [Greet: method]"]
+        C3["Chunk 3: main<br/>+ package, imports<br/>Symbols: [main: function]"]
+    end
+
+    subgraph Step3["Step 3: Size Check"]
+        Check{Each chunk<br/>< 1500 tokens?}
+        Check -->|Yes| Keep[Keep as-is]
+        Check -->|No| Split[Recursive split]
+    end
+
+    subgraph Step4["Step 4: Merge Small"]
+        Merge{Adjacent chunks<br/>< 500 tokens?}
+        Merge -->|Yes| Combine[Merge chunks]
+        Merge -->|No| Final[Final chunks]
+    end
+
+    Input --> Step1
+    Type --> C1
+    Method --> C2
+    Func --> C3
+    Step2 --> Step3 --> Step4
+
+    style Input fill:#3498db,color:#fff
+    style Step1 fill:#9b59b6,color:#fff
+    style Step2 fill:#e67e22,color:#fff
+    style Step3 fill:#f39c12,color:#fff
+    style Step4 fill:#27ae60,color:#fff
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    cAST CHUNKING ALGORITHM                       │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Input: Go source file                                          │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  package main                                               │ │
-│  │                                                             │ │
-│  │  import "fmt"                                               │ │
-│  │                                                             │ │
-│  │  type User struct {                                         │ │
-│  │      Name string                                            │ │
-│  │      Age  int                                               │ │
-│  │  }                                                          │ │
-│  │                                                             │ │
-│  │  func (u *User) Greet() string {                           │ │
-│  │      return fmt.Sprintf("Hello, %s", u.Name)               │ │
-│  │  }                                                          │ │
-│  │                                                             │ │
-│  │  func main() {                                              │ │
-│  │      user := User{Name: "Alice", Age: 30}                  │ │
-│  │      fmt.Println(user.Greet())                             │ │
-│  │  }                                                          │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                          ▼                                       │
-│  Step 1: Parse into AST                                         │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  source_file                                                │ │
-│  │  ├── package_clause                                         │ │
-│  │  ├── import_declaration                                     │ │
-│  │  ├── type_declaration (User struct)                        │ │
-│  │  ├── method_declaration (User.Greet)                       │ │
-│  │  └── function_declaration (main)                           │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                          ▼                                       │
-│  Step 2: Extract top-level nodes with context                   │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  Chunk 1: User struct                                       │ │
-│  │  ├── Include: package, imports                              │ │
-│  │  ├── Content: type definition                               │ │
-│  │  └── Symbols: [{name: "User", type: "struct"}]             │ │
-│  │                                                             │ │
-│  │  Chunk 2: User.Greet method                                 │ │
-│  │  ├── Include: package, imports, User type reference        │ │
-│  │  ├── Content: method definition                             │ │
-│  │  └── Symbols: [{name: "Greet", type: "method"}]            │ │
-│  │                                                             │ │
-│  │  Chunk 3: main function                                     │ │
-│  │  ├── Include: package, imports                              │ │
-│  │  ├── Content: function definition                           │ │
-│  │  └── Symbols: [{name: "main", type: "function"}]           │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                          ▼                                       │
-│  Step 3: Size check and recursive splitting if needed           │
-│  (All chunks < 1500 tokens, no splitting required)              │
-│                          ▼                                       │
-│  Step 4: Merge small adjacent chunks if beneficial              │
-│  (Optional: merge if combined < 500 tokens)                     │
-└─────────────────────────────────────────────────────────────────┘
+
+```mermaid
+graph TD
+    subgraph AST["AST Structure"]
+        Root[source_file]
+        Root --> P[package main]
+        Root --> I[import 'fmt']
+        Root --> T[type User struct]
+        Root --> M[func Greet]
+        Root --> F[func main]
+
+        T --> TF1[Name string]
+        T --> TF2[Age int]
+
+        M --> MR[receiver: *User]
+        M --> MB[body: return ...]
+
+        F --> FB[body: user := ...]
+    end
+
+    style Root fill:#e74c3c,color:#fff
+    style T fill:#9b59b6,color:#fff
+    style M fill:#3498db,color:#fff
+    style F fill:#27ae60,color:#fff
 ```
 
 ---
@@ -625,66 +739,114 @@ func ConfigureMemory() {
 
 ### 5.2 Latency Optimization
 
+```mermaid
+gantt
+    title Query Latency Breakdown: "authentication middleware"
+    dateFormat X
+    axisFormat %L ms
+
+    section Parsing
+    Query parsing     :done, 0, 1
+    Classification    :done, 1, 3
+
+    section Search
+    Query embedding   :active, 3, 53
+    BM25 search       :done, 3, 8
+    Vector search     :done, 3, 13
+
+    section Fusion
+    Score fusion      :done, 53, 54
+    Result format     :done, 54, 55
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    LATENCY BREAKDOWN                             │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Query: "authentication middleware"                             │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Component             Target    Strategy                │   │
-│  ├──────────────────────────────────────────────────────────┤   │
-│  │  Query parsing         < 1ms     Simple string ops       │   │
-│  │  Query classification  < 2ms     Pattern matching        │   │
-│  │  Query embedding       ~30-50ms  Ollama (cached)         │   │
-│  │  BM25 search           < 5ms     Inverted index lookup   │   │
-│  │  Vector search         < 10ms    HNSW similarity         │   │
-│  │  Score fusion          < 1ms     Simple arithmetic       │   │
-│  │  Result formatting     < 1ms     JSON serialization      │   │
-│  ├──────────────────────────────────────────────────────────┤   │
-│  │  Total (cold)          ~70ms                             │   │
-│  │  Total (warm cache)    ~20ms     Embedding cached        │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                  │
-│  Optimization: LRU cache for frequent queries                    │
-└─────────────────────────────────────────────────────────────────┘
+
+```mermaid
+flowchart LR
+    subgraph Cold["Cold Query (~70ms)"]
+        C1[Parse<br/>1ms] --> C2[Classify<br/>2ms]
+        C2 --> C3[Embed<br/>50ms]
+        C3 --> C4[Search<br/>10ms]
+        C4 --> C5[Fuse<br/>1ms]
+        C5 --> C6[Format<br/>1ms]
+    end
+
+    subgraph Warm["Warm Query (~20ms)"]
+        W1[Parse<br/>1ms] --> W2[Classify<br/>2ms]
+        W2 --> W3[Cache Hit<br/>0ms]
+        W3 --> W4[Search<br/>10ms]
+        W4 --> W5[Fuse<br/>1ms]
+        W5 --> W6[Format<br/>1ms]
+    end
+
+    Cache[(LRU Cache<br/>Embeddings)]
+    C3 -.->|store| Cache
+    Cache -.->|hit| W3
+
+    style Cold fill:#e74c3c,color:#fff
+    style Warm fill:#27ae60,color:#fff
+    style Cache fill:#3498db,color:#fff
 ```
+
+| Component | Target | Strategy |
+|-----------|--------|----------|
+| Query parsing | < 1ms | Simple string ops |
+| Classification | < 2ms | Pattern matching |
+| Query embedding | ~30-50ms | Ollama (cached) |
+| BM25 search | < 5ms | Inverted index |
+| Vector search | < 10ms | HNSW |
+| Score fusion | < 1ms | Simple arithmetic |
+| **Total (cold)** | **~70ms** | |
+| **Total (warm)** | **~20ms** | Embedding cached |
 
 ### 5.3 Indexing Throughput
 
+```mermaid
+flowchart LR
+    subgraph Pipeline["Indexing Pipeline Throughput"]
+        D[File Discovery<br/>10,000+/sec]
+        R[File Reading<br/>5,000+/sec]
+        P[AST Parsing<br/>2,000+/sec]
+        C[Chunking<br/>3,000+/sec]
+        E[Embedding<br/>200-500/sec]
+        S[Storage<br/>5,000+/sec]
+    end
+
+    D --> R --> P --> C --> E --> S
+
+    E -.->|BOTTLENECK| Note["Ollama API inference<br/>bounds throughput"]
+
+    style D fill:#27ae60,color:#fff
+    style R fill:#27ae60,color:#fff
+    style P fill:#27ae60,color:#fff
+    style C fill:#27ae60,color:#fff
+    style E fill:#e74c3c,color:#fff
+    style S fill:#27ae60,color:#fff
+    style Note fill:#f39c12,color:#fff
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    INDEXING PIPELINE                             │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Bottleneck: Embedding generation (Ollama API inference)        │
-│                                                                  │
-│  Strategy: Batch processing + parallelism                       │
-│                                                                  │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  Pipeline Stage        Files/sec   Strategy                │ │
-│  ├────────────────────────────────────────────────────────────┤ │
-│  │  File discovery        10,000+     Concurrent walk         │ │
-│  │  File reading          5,000+      Buffered I/O            │ │
-│  │  AST parsing           2,000+      tree-sitter (fast)      │ │
-│  │  Chunking              3,000+      Simple splitting        │ │
-│  │  Embedding (Ollama)    200-500     Batch + concurrent      │ │
-│  │  Storage               5,000+      Batch writes            │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                  │
-│  Effective throughput: ~100-200 files/sec (embedding-bound)     │
-│                                                                  │
-│  For 10K files: ~50-100 seconds initial index                   │
-│  For 100K files: ~10-20 minutes initial index                   │
-│                                                                  │
-│  Mitigation:                                                     │
-│  1. Show progress bar with ETA                                  │
-│  2. Incremental: only re-index changed files                    │
-│  3. Background indexing: serve queries while indexing           │
-│  4. Priority: index frequently-accessed dirs first               │
-└─────────────────────────────────────────────────────────────────┘
+
+```mermaid
+xychart-beta
+    title "Indexing Time by Codebase Size"
+    x-axis ["1K files", "10K files", "50K files", "100K files"]
+    y-axis "Time (minutes)" 0 --> 25
+    bar [0.2, 1.5, 8, 18]
 ```
+
+| Pipeline Stage | Throughput | Strategy |
+|----------------|------------|----------|
+| File discovery | 10,000+/sec | Concurrent walk |
+| File reading | 5,000+/sec | Buffered I/O |
+| AST parsing | 2,000+/sec | tree-sitter (fast) |
+| Chunking | 3,000+/sec | Simple splitting |
+| **Embedding** | **200-500/sec** | **Batch + concurrent (bottleneck)** |
+| Storage | 5,000+/sec | Batch writes |
+
+**Effective throughput:** ~100-200 files/sec (embedding-bound)
+
+**Mitigations:**
+1. Progress bar with ETA
+2. Incremental indexing (changed files only)
+3. Background indexing (serve queries while indexing)
+4. Priority indexing (frequently-accessed dirs first)
 
 ---
 
@@ -703,33 +865,56 @@ func ConfigureMemory() {
 
 ### 6.2 Graceful Degradation
 
+```mermaid
+flowchart TB
+    subgraph Embedding["Embedding Fallback Chain"]
+        E1[OllamaEmbedder<br/>Qwen3-0.6B] -->|fail| E2[Static768<br/>Hash-based]
+        E2 -->|works| EC[Continue with<br/>reduced quality]
+
+        style E1 fill:#27ae60,color:#fff
+        style E2 fill:#f39c12,color:#fff
+    end
+
+    subgraph Parsing["Code Parsing Fallback Chain"]
+        P1[tree-sitter<br/>AST parsing] -->|fail| P2[Regex-based<br/>extraction]
+        P2 -->|fail| P3[Line-based<br/>chunking]
+        P3 -->|works| PC[Continue]
+
+        style P1 fill:#27ae60,color:#fff
+        style P2 fill:#f39c12,color:#fff
+        style P3 fill:#e74c3c,color:#fff
+    end
+
+    subgraph Search["Search Fallback Chain"]
+        S1[Hybrid Search<br/>BM25 + Vector] -->|vector fail| S2[BM25 Only<br/>Keyword search]
+        S2 -->|works| SC[Continue with<br/>keyword results]
+
+        style S1 fill:#27ae60,color:#fff
+        style S2 fill:#f39c12,color:#fff
+    end
+
+    Principle["Principle: Always return something useful"]
+    EC --> Principle
+    PC --> Principle
+    SC --> Principle
+
+    style Principle fill:#3498db,color:#fff
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    FALLBACK CHAIN                                │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Embedding Generation:                                          │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  1. OllamaEmbedder (Ollama)    ── fail ──►              │   │
-│  │  2. Static768 embeddings       ── works ──► Continue     │   │
-│  │     (768 dims, dimension-compatible, no re-indexing)     │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                  │
-│  Code Parsing:                                                   │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  1. tree-sitter AST parsing    ── fail ──►              │   │
-│  │  2. Regex-based extraction     ── fail ──►              │   │
-│  │  3. Line-based chunking        ── works ──► Continue     │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                  │
-│  Search:                                                         │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  1. Hybrid (BM25 + Vector)     ── vec fail ──►          │   │
-│  │  2. BM25 only                  ── works ──► Continue     │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                  │
-│  Principle: Always return something useful                       │
-└─────────────────────────────────────────────────────────────────┘
+
+```mermaid
+flowchart LR
+    subgraph Quality["Quality Levels"]
+        Q1["Full Quality<br/>Hybrid + Neural"]
+        Q2["Degraded<br/>BM25 + Static"]
+        Q3["Minimal<br/>BM25 Only"]
+    end
+
+    Q1 -->|Ollama down| Q2
+    Q2 -->|Embedding fail| Q3
+
+    style Q1 fill:#27ae60,color:#fff
+    style Q2 fill:#f39c12,color:#fff
+    style Q3 fill:#e74c3c,color:#fff
 ```
 
 ---
@@ -738,34 +923,48 @@ func ConfigureMemory() {
 
 ### 7.1 Threat Model
 
+```mermaid
+flowchart TB
+    subgraph Trusted["TRUSTED ZONE (User's Machine)"]
+        Claude[Claude Code<br/>Client]
+        AmanMCP[AmanMCP<br/>Server]
+        FS[(File System<br/>Project)]
+        Ollama[Ollama<br/>localhost:11434]
+
+        Claude <-->|MCP Protocol| AmanMCP
+        AmanMCP --> FS
+        AmanMCP <-->|localhost only| Ollama
+    end
+
+    subgraph Untrusted["UNTRUSTED ZONE (External Network)"]
+        Internet((Internet))
+        Cloud[Cloud Services]
+        Telemetry[Telemetry]
+    end
+
+    AmanMCP x--x|"No outbound"| Internet
+    AmanMCP x--x|"No cloud sync"| Cloud
+    AmanMCP x--x|"No telemetry"| Telemetry
+
+    style Trusted fill:#d5f4e6,color:#000
+    style Untrusted fill:#fadbd8,color:#000
+    style Claude fill:#3498db,color:#fff
+    style AmanMCP fill:#27ae60,color:#fff
+    style FS fill:#9b59b6,color:#fff
+    style Ollama fill:#e67e22,color:#fff
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    SECURITY BOUNDARIES                           │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │  TRUSTED ZONE (User's Machine)                          │    │
-│  │                                                         │    │
-│  │  ┌───────────────┐    ┌───────────────┐                │    │
-│  │  │  Claude Code  │◄──►│   AmanMCP     │                │    │
-│  │  │  (Client)     │    │   (Server)    │                │    │
-│  │  └───────────────┘    └───────┬───────┘                │    │
-│  │                               │                         │    │
-│  │                        ┌──────▼────────┐                │    │
-│  │                        │  File System  │                │    │
-│  │                        │  (project)    │                │    │
-│  │                        └───────────────┘                │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │  UNTRUSTED ZONE (External Network)                      │    │
-│  │                                                         │    │
-│  │  ✗ No outbound connections                              │    │
-│  │  ✗ No telemetry                                         │    │
-│  │  ✗ No cloud sync                                        │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+
+```mermaid
+flowchart LR
+    subgraph Privacy["Privacy Guarantees"]
+        P1["100% Local<br/>No internet after install"]
+        P2["No Telemetry<br/>Zero data collection"]
+        P3["No Cloud<br/>Code stays on machine"]
+    end
+
+    style P1 fill:#27ae60,color:#fff
+    style P2 fill:#27ae60,color:#fff
+    style P3 fill:#27ae60,color:#fff
 ```
 
 ### 7.2 Sensitive File Handling
@@ -812,40 +1011,61 @@ var SensitivePatterns = []string{
 
 ### 8.1 Plugin Architecture (Future)
 
+```mermaid
+classDiagram
+    class Chunker {
+        <<interface>>
+        +Name() string
+        +Extensions() []string
+        +Chunk(path, content) []Chunk, error
+    }
+
+    class Embedder {
+        <<interface>>
+        +Name() string
+        +Dimensions() int
+        +Embed(text) []float32, error
+    }
+
+    class Searcher {
+        <<interface>>
+        +Name() string
+        +Search(query, opts) []Result, error
+    }
+
+    class PluginManager {
+        +LoadPlugins(dir string)
+        +RegisterChunker(c Chunker)
+        +RegisterEmbedder(e Embedder)
+        +RegisterSearcher(s Searcher)
+    }
+
+    PluginManager --> Chunker : loads
+    PluginManager --> Embedder : loads
+    PluginManager --> Searcher : loads
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    PLUGIN SYSTEM (v2.0)                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Plugin Types:                                            │   │
-│  │                                                           │   │
-│  │  1. Chunkers (add language support)                      │   │
-│  │     interface Chunker {                                   │   │
-│  │       Name() string                                       │   │
-│  │       Extensions() []string                               │   │
-│  │       Chunk(path, content) ([]Chunk, error)              │   │
-│  │     }                                                     │   │
-│  │                                                           │   │
-│  │  2. Embedders (add embedding providers)                   │   │
-│  │     interface Embedder {                                  │   │
-│  │       Name() string                                       │   │
-│  │       Dimensions() int                                    │   │
-│  │       Embed(text) ([]float32, error)                     │   │
-│  │     }                                                     │   │
-│  │                                                           │   │
-│  │  3. Searchers (add search strategies)                    │   │
-│  │     interface Searcher {                                  │   │
-│  │       Name() string                                       │   │
-│  │       Search(query, opts) ([]Result, error)              │   │
-│  │     }                                                     │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                  │
-│  Plugin Location: ~/.amanmcp/plugins/                            │
-│  Discovery: Automatic at startup                                 │
-│  Format: Shared libraries (.so/.dylib) or gRPC services         │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+
+```mermaid
+flowchart TB
+    subgraph PluginSystem["Plugin System (v2.0)"]
+        subgraph Types["Plugin Types"]
+            Chunkers["Chunkers<br/>Add language support"]
+            Embedders["Embedders<br/>Add embedding providers"]
+            Searchers["Searchers<br/>Add search strategies"]
+        end
+
+        subgraph Discovery["Plugin Discovery"]
+            Dir["~/.amanmcp/plugins/"]
+            Startup["Auto-load at startup"]
+            Format["Format: .so/.dylib or gRPC"]
+        end
+    end
+
+    Types --> Discovery
+
+    style Chunkers fill:#3498db,color:#fff
+    style Embedders fill:#9b59b6,color:#fff
+    style Searchers fill:#27ae60,color:#fff
 ```
 
 ### 8.2 Language Support Matrix
@@ -873,21 +1093,28 @@ var SensitivePatterns = []string{
 
 ### 9.1 Test Pyramid
 
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#3498db'}}}%%
+flowchart TB
+    subgraph Pyramid["Test Pyramid"]
+        E2E["E2E Tests<br/>MCP protocol compliance<br/>Full server tests"]
+        Integration["Integration Tests<br/>Component interactions<br/>Database operations"]
+        Unit["Unit Tests<br/>Chunkers, BM25, Fusion<br/>Edge cases"]
+    end
+
+    E2E --> Integration --> Unit
+
+    style E2E fill:#e74c3c,color:#fff
+    style Integration fill:#f39c12,color:#fff
+    style Unit fill:#27ae60,color:#fff
 ```
-                    ┌───────────┐
-                    │    E2E    │  MCP protocol compliance
-                    │   Tests   │  Full server tests
-                    └─────┬─────┘
-                          │
-              ┌───────────┴───────────┐
-              │   Integration Tests   │  Component interactions
-              │   (Search, Indexing)  │  Database operations
-              └───────────┬───────────┘
-                          │
-        ┌─────────────────┴─────────────────┐
-        │          Unit Tests               │  Individual functions
-        │   (Chunkers, BM25, Fusion)        │  Edge cases
-        └───────────────────────────────────┘
+
+```mermaid
+pie showData
+    title "Test Distribution Target"
+    "Unit Tests" : 70
+    "Integration Tests" : 20
+    "E2E Tests" : 10
 ```
 
 ### 9.2 Benchmark Suite

@@ -136,8 +136,8 @@ ollama serve
 In a **new terminal window**, pull the embedding model:
 
 ```bash
-# Pull the recommended embedding model (~2GB download)
-ollama pull qwen3-embedding:8b
+# Pull the recommended embedding model (~400MB download)
+ollama pull qwen3-embedding:0.6b
 ```
 
 Verify the model is available:
@@ -146,7 +146,7 @@ Verify the model is available:
 ollama list
 ```
 
-You should see `qwen3-embedding:8b` in the list.
+You should see `qwen3-embedding:0.6b` in the list.
 
 ### Step 2: (Optional) Auto-Start MLX Server
 
@@ -239,7 +239,7 @@ amanmcp version
 **Expected output:**
 
 ```
-amanmcp 0.1.43 (commit: f6a73f7, built: 2026-01-05T07:22:29Z, go: go1.25.5)
+amanmcp 0.10.2 (commit: abc1234, built: 2026-01-16T00:00:00Z, go: go1.25.5)
 ```
 
 If you see `zsh: killed`, see the [Troubleshooting](#troubleshooting) section below.
@@ -274,7 +274,7 @@ amanmcp init
 
 ```
 $ amanmcp init
-AmanMCP v0.1.43 - Initializing...
+AmanMCP v0.10.2 - Initializing...
 
 Project: /Users/you/your-project
 
@@ -391,7 +391,7 @@ amanmcp status
 amanmcp search "user authentication"
 
 # Re-index after major code changes
-amanmcp --reindex
+amanmcp index --force
 
 # Diagnose problems
 amanmcp doctor
@@ -657,7 +657,7 @@ rm -rf /path/to/project/.amanmcp
 
 ```bash
 # Force re-index
-amanmcp --reindex
+amanmcp index --force
 
 # Or delete the index and run again
 rm -rf .amanmcp/

@@ -13,7 +13,6 @@
 
 | Location | Purpose |
 |----------|---------|
-| `.claude/philosophy/` | Development philosophy and principles |
 | `.aman-pm/processes/` | Workflow and validation |
 | `.aman-pm/backlog/debt/` | Technical debt tracking |
 | `.aman-pm/validation/` | Testing metrics |

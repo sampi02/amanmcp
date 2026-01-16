@@ -16,6 +16,21 @@ Hybrid search combines two complementary approaches:
 
 Neither alone is sufficient. Together, they're powerful.
 
+```mermaid
+flowchart LR
+    Query[Query] --> BM25[BM25<br/>Keywords]
+    Query --> Vector[Vector<br/>Semantic]
+
+    BM25 --> RRF[RRF Fusion]
+    Vector --> RRF
+
+    RRF --> Results[Best Results]
+
+    style BM25 fill:#3498db,color:#fff
+    style Vector fill:#9b59b6,color:#fff
+    style RRF fill:#27ae60,color:#fff
+```
+
 ---
 
 ## Why Hybrid?
@@ -52,13 +67,31 @@ But fails for:
 
 Combine both and get best of each:
 
-```
-Query: "useEffect cleanup function"
+```mermaid
+flowchart TB
+    Query["Query: 'useEffect cleanup function'"]
 
-BM25 finds: Exact "useEffect" matches
-Vector finds: Conceptually similar hook patterns
+    subgraph BM25Result["BM25 Finds"]
+        B1["Exact 'useEffect' matches"]
+        B2["File: hooks.ts:45"]
+    end
 
-Fusion: Best of both, ranked together
+    subgraph VectorResult["Vector Finds"]
+        V1["Conceptually similar hook patterns"]
+        V2["cleanup patterns, effect handlers"]
+    end
+
+    Query --> BM25Result
+    Query --> VectorResult
+
+    BM25Result --> Fusion[RRF Fusion]
+    VectorResult --> Fusion
+
+    Fusion --> Best["Best of both, ranked together"]
+
+    style BM25Result fill:#3498db,color:#fff
+    style VectorResult fill:#9b59b6,color:#fff
+    style Fusion fill:#27ae60,color:#fff
 ```
 
 ---
@@ -127,11 +160,22 @@ Vector search finds semantically similar documents using embeddings.
 
 ### Core Idea
 
-```
-1. Convert text to vector (embedding)
-2. Store vectors in index
-3. Convert query to vector
-4. Find nearest neighbors (cosine similarity)
+```mermaid
+flowchart LR
+    subgraph Index["Indexing Time"]
+        T1[Text] --> E1[Embed] --> V1[Vector]
+        V1 --> Store[(Vector Index)]
+    end
+
+    subgraph Query["Query Time"]
+        Q[Query] --> E2[Embed] --> QV[Query Vector]
+        QV --> Search{Find Nearest<br/>Neighbors}
+        Store --> Search
+        Search --> Results[Similar Docs]
+    end
+
+    style Index fill:#e67e22,color:#fff
+    style Query fill:#27ae60,color:#fff
 ```
 
 ### Embeddings
@@ -145,6 +189,27 @@ An embedding is a dense vector (e.g., 768 dimensions) that captures meaning:
 ```
 
 Similar meanings → Similar vectors → Close in vector space
+
+```mermaid
+flowchart TB
+    subgraph VectorSpace["Vector Space Visualization"]
+        Auth["'authentication'"]
+        Login["'login'"]
+        Cred["'credentials'"]
+        Weather["'weather'"]
+
+        Auth <-.->|"close"| Login
+        Auth <-.->|"close"| Cred
+        Login <-.->|"close"| Cred
+
+        Weather x--x|"far apart"| Auth
+    end
+
+    style Auth fill:#27ae60,color:#fff
+    style Login fill:#27ae60,color:#fff
+    style Cred fill:#27ae60,color:#fff
+    style Weather fill:#e74c3c,color:#fff
+```
 
 ### HNSW (Hierarchical Navigable Small Worlds)
 
@@ -288,30 +353,52 @@ func classifyQuery(query string) (bm25Weight, vecWeight float64) {
 
 ### Full Search Flow
 
+```mermaid
+flowchart TB
+    Query["Query: 'authentication middleware'"]
+
+    Query --> Classifier["Query Classifier"]
+    Classifier -->|"Weights: 0.5, 0.5"| Split
+
+    Split --> BM25["BM25 Search<br/>Keyword"]
+    Split --> Vector["Vector Search<br/>Semantic"]
+
+    BM25 --> RRF["RRF Fusion<br/>Combine results"]
+    Vector --> RRF
+
+    RRF --> Final["Final Results"]
+
+    style Query fill:#3498db,color:#fff
+    style Classifier fill:#f39c12,color:#fff
+    style BM25 fill:#9b59b6,color:#fff
+    style Vector fill:#9b59b6,color:#fff
+    style RRF fill:#27ae60,color:#fff
+    style Final fill:#27ae60,color:#fff
 ```
-Query: "authentication middleware"
-           │
-           ▼
-    ┌──────────────┐
-    │ Query        │
-    │ Classifier   │ → Determine weights (0.5, 0.5)
-    └──────┬───────┘
-           │
-     ┌─────┴─────┐
-     ▼           ▼
-┌─────────┐ ┌─────────┐
-│  BM25   │ │ Vector  │  ← Parallel execution
-│ Search  │ │ Search  │
-└────┬────┘ └────┬────┘
-     │           │
-     └─────┬─────┘
-           ▼
-    ┌──────────────┐
-    │ RRF Fusion   │ → Combine results
-    └──────┬───────┘
-           │
-           ▼
-      Final Results
+
+```mermaid
+sequenceDiagram
+    participant Q as Query
+    participant C as Classifier
+    participant B as BM25
+    participant V as Vector
+    participant R as RRF
+
+    Q->>C: "authentication middleware"
+    C->>C: Classify → mixed
+    C-->>B: weights: 0.5
+    C-->>V: weights: 0.5
+
+    par Parallel Search
+        B->>B: Search inverted index
+        B-->>R: [chunk_A, chunk_B, ...]
+    and
+        V->>V: Embed → HNSW search
+        V-->>R: [chunk_C, chunk_A, ...]
+    end
+
+    R->>R: RRF fusion (k=60)
+    R-->>Q: Final ranked results
 ```
 
 ### Code Structure

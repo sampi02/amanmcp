@@ -90,10 +90,10 @@ Definitions of terms used throughout AmanMCP documentation and code.
 | Term | Definition |
 |------|------------|
 | **AmanMCP** | This project. Local-first RAG MCP server for developers. |
-| **chromem-go** | Pure Go in-memory vector database. Fallback for small codebases. |
-| **EmbeddingGemma** | Code-optimized embedding model. 768 dimensions, 2048 token context. Default model. |
-| **Hugot** | Go library for running ONNX models locally. Used for embedding generation. |
-| **USearch** | High-performance vector search library. Primary vector store. |
+| **coder/hnsw** | Pure Go HNSW vector database. Primary vector store (300K+ scale). |
+| **Ollama** | Local LLM runner. Default embedding provider for AmanMCP. |
+| **MLX** | Apple's machine learning framework. Optional faster embeddings on Apple Silicon. |
+| **qwen3-embedding** | Default embedding model (0.6b variant). Optimized for code and documentation. |
 
 ---
 

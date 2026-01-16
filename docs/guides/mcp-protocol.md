@@ -294,7 +294,7 @@ Configuration in Claude Code:
 
 ### Using the Official SDK
 
-AmanMCP uses the official MCP Go SDK from Google and Anthropic:
+AmanMCP uses the official MCP Go SDK from Anthropic:
 
 ```go
 import (

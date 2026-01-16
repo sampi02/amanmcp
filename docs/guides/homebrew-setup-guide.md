@@ -78,7 +78,7 @@ class Amanmcp < Formula
 
       For best search quality, install Ollama:
         brew install ollama && ollama serve
-        ollama pull qwen3-embedding:8b
+        ollama pull qwen3-embedding:0.6b
     EOS
   end
 

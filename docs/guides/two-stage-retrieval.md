@@ -19,26 +19,35 @@ Cross-encoders are **O(n)** - they must process every query-document pair. Embed
 
 ## Two-Stage Pipeline
 
+```mermaid
+flowchart LR
+    subgraph Stage1["STAGE 1: Retrieve"]
+        Docs[(10,000+ docs)]
+        BiEncoder["Bi-encoder<br/>(Embeddings)"]
+        Candidates["50 candidates"]
+
+        Docs --> BiEncoder --> Candidates
+    end
+
+    subgraph Stage2["STAGE 2: Rerank"]
+        CrossEncoder["Cross-encoder<br/>(Reranker)"]
+        Final["10 results"]
+
+        Candidates --> CrossEncoder --> Final
+    end
+
+    style Stage1 fill:#3498db,color:#fff
+    style Stage2 fill:#27ae60,color:#fff
+    style BiEncoder fill:#9b59b6,color:#fff
+    style CrossEncoder fill:#e67e22,color:#fff
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         SEARCH PIPELINE                              │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  10,000+ documents          50 candidates              10 results   │
-│         │                        │                          │       │
-│         ▼                        ▼                          ▼       │
-│   ┌──────────┐             ┌──────────┐              ┌──────────┐   │
-│   │  STAGE 1 │             │  STAGE 2 │              │  FINAL   │   │
-│   │ Retrieve │────────────▶│  Rerank  │─────────────▶│ Results  │   │
-│   └──────────┘             └──────────┘              └──────────┘   │
-│                                                                      │
-│   Bi-encoder               Cross-encoder                            │
-│   (Embeddings)             (Reranker)                               │
-│                                                                      │
-│   Speed: ~50ms             Speed: ~2000ms                           │
-│   for 10K docs             for 50 docs                              │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
+
+```mermaid
+xychart-beta
+    title "Speed Comparison"
+    x-axis ["Bi-encoder (10K docs)", "Cross-encoder (50 docs)"]
+    y-axis "Time (ms)" 0 --> 2500
+    bar [50, 2000]
 ```
 
 ---
@@ -60,22 +69,20 @@ Cross-encoders are **O(n)** - they must process every query-document pair. Embed
 - Store: HNSW index (`internal/store/hnsw.go`)
 - Embedder: `internal/embed/ollama.go` or MLX
 
-```
-Query: "search implementation"
-         │
-         ▼
-    ┌─────────┐
-    │ Embed   │ ──▶ [0.12, -0.34, 0.56, ...]  (1024 dims)
-    └─────────┘
-         │
-         ▼
-    ┌─────────┐
-    │ Vector  │ ──▶ Find top 50 nearest neighbors
-    │ Search  │     (pre-computed doc embeddings)
-    └─────────┘
-         │
-         ▼
-    50 candidates
+```mermaid
+flowchart TB
+    Query["Query: 'search implementation'"]
+
+    Embed["Embed<br/>[0.12, -0.34, 0.56, ...] (1024 dims)"]
+    VectorSearch["Vector Search<br/>Find top 50 nearest neighbors<br/>(pre-computed doc embeddings)"]
+    Candidates["50 candidates"]
+
+    Query --> Embed --> VectorSearch --> Candidates
+
+    style Query fill:#3498db,color:#fff
+    style Embed fill:#9b59b6,color:#fff
+    style VectorSearch fill:#e67e22,color:#fff
+    style Candidates fill:#27ae60,color:#fff
 ```
 
 ---
@@ -97,26 +104,44 @@ Query: "search implementation"
 - Client: `internal/search/mlx_reranker.go`
 - Latency: ~40ms per document
 
+```mermaid
+flowchart LR
+    subgraph Input1["Input Pair 1"]
+        Q1["Query: 'search implementation'"]
+        D1["Doc 1: 'func Search() {...}'"]
+    end
+
+    subgraph Input2["Input Pair 2"]
+        Q2["Query: 'search implementation'"]
+        D2["Doc 2: 'test cases for...'"]
+    end
+
+    CE1["Cross-Encoder"]
+    CE2["Cross-Encoder"]
+
+    Input1 --> CE1 --> S1["Score: 0.95"]
+    Input2 --> CE2 --> S2["Score: 0.23"]
+
+    style CE1 fill:#27ae60,color:#fff
+    style CE2 fill:#e74c3c,color:#fff
+    style S1 fill:#27ae60,color:#fff
+    style S2 fill:#e74c3c,color:#fff
 ```
-Query: "search implementation"
-Doc 1: "func Search() { ... }"
-         │
-         ▼
-    ┌──────────────┐
-    │ Cross-Encoder│ ──▶ Score: 0.95
-    │ (query, doc) │
-    └──────────────┘
 
-Query: "search implementation"
-Doc 2: "test cases for..."
-         │
-         ▼
-    ┌──────────────┐
-    │ Cross-Encoder│ ──▶ Score: 0.23
-    │ (query, doc) │
-    └──────────────┘
+```mermaid
+sequenceDiagram
+    participant Q as Query
+    participant CE as Cross-Encoder
+    participant R as Ranked Results
 
-... repeat for all 50 candidates ...
+    loop For each of 50 candidates
+        Q->>CE: (query, doc_i)
+        CE->>CE: Full attention over both
+        CE-->>R: score_i
+    end
+
+    R->>R: Sort by score
+    R-->>Q: Top 10 results
 ```
 
 ---

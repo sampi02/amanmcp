@@ -29,7 +29,7 @@ amanmcp doctor
 | **Go** | 1.25.5+ | Build only | Not needed at runtime |
 | **CGO Toolchain** | Any | Build only | For tree-sitter only |
 
-**Note:** v0.1.38+ uses gollama.cpp (purego) for embeddings - no external dependencies needed.
+**Note:** AmanMCP uses Ollama for embeddings by default. Static embeddings are available for offline use.
 
 ---
 
@@ -88,7 +88,7 @@ AmanMCP validates your system on first run:
 | Write permissions | Can create files | Yes |
 | File descriptors | 1024 limit | Yes |
 
-**Skip checks:** `amanmcp --skip-check`
+**Run diagnostics:** `amanmcp doctor`
 
 ---
 
@@ -123,7 +123,7 @@ The embedding model downloads automatically on first use:
 amanmcp setup
 
 # Use offline mode (static embeddings)
-amanmcp --offline
+amanmcp init --offline
 ```
 
 ### "Write permission denied"

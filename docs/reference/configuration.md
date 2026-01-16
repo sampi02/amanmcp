@@ -166,7 +166,7 @@ Configures the embedding provider and thermal management.
 | Key | Type | Default | Description | Env Override |
 |-----|------|---------|-------------|--------------|
 | `embeddings.provider` | string | `"auto"` | Provider: `mlx`, `ollama`, `static` (auto-detects MLX on Apple Silicon) | `AMANMCP_EMBEDDER` |
-| `embeddings.model` | string | `"qwen3-embedding:8b"` | Model identifier | `AMANMCP_EMBEDDINGS_MODEL` |
+| `embeddings.model` | string | `"qwen3-embedding:0.6b"` | Model identifier | `AMANMCP_EMBEDDINGS_MODEL` |
 | `embeddings.dimensions` | int | `0` (auto) | Embedding dimensions (0 = auto-detect) | - |
 | `embeddings.batch_size` | int | `32` | Texts per batch (1-256) | - |
 | `embeddings.model_download_timeout` | duration | `10m` | Timeout for model downloads | - |

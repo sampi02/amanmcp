@@ -21,16 +21,24 @@ Tree-sitter is a parser generator tool and incremental parsing library. It build
 
 Code is structured data. Tree-sitter converts text into a tree:
 
-```
-Source: func hello() { return "world" }
+```mermaid
+graph TD
+    Source["Source: func hello() { return 'world' }"]
 
-Tree:
-function_declaration
-├── name: identifier ("hello")
-├── parameters: parameter_list ()
-└── body: block
-    └── return_statement
-        └── expression: string_literal ("world")
+    subgraph AST["Abstract Syntax Tree"]
+        FD[function_declaration]
+        FD --> Name["name: identifier<br/>'hello'"]
+        FD --> Params["parameters: parameter_list<br/>()"]
+        FD --> Body["body: block"]
+        Body --> Return["return_statement"]
+        Return --> Expr["expression: string_literal<br/>'world'"]
+    end
+
+    Source --> AST
+
+    style FD fill:#e74c3c,color:#fff
+    style Body fill:#3498db,color:#fff
+    style Return fill:#27ae60,color:#fff
 ```
 
 ### Why Not Regex?
@@ -54,13 +62,30 @@ Tree-sitter handles nesting correctly because it understands grammar.
 
 When code changes, tree-sitter doesn't re-parse everything:
 
-```
-Edit: Change "hello" to "greet"
+```mermaid
+flowchart LR
+    subgraph Before["Before Edit"]
+        B1["function_declaration"]
+        B2["name: 'hello'"]
+        B3["parameters"]
+        B4["body"]
+    end
 
-Old tree reused:        Only re-parsed:
-├── parameters          └── name: identifier ("greet")
-├── body
-└── ...
+    subgraph After["After Edit: 'hello' → 'greet'"]
+        A1["function_declaration<br/>(reused)"]
+        A2["name: 'greet'<br/>(re-parsed)"]
+        A3["parameters<br/>(reused)"]
+        A4["body<br/>(reused)"]
+    end
+
+    B1 -.->|reuse| A1
+    B3 -.->|reuse| A3
+    B4 -.->|reuse| A4
+
+    style A2 fill:#e67e22,color:#fff
+    style A1 fill:#27ae60,color:#fff
+    style A3 fill:#27ae60,color:#fff
+    style A4 fill:#27ae60,color:#fff
 ```
 
 For AmanMCP, this means fast re-indexing on file changes.
@@ -103,8 +128,17 @@ module.exports = grammar({
 
 Grammar compiles to a state machine (C code):
 
-```
-grammar.js → tree-sitter generate → parser.c
+```mermaid
+flowchart LR
+    Grammar["grammar.js<br/>(language definition)"]
+    Generate["tree-sitter generate"]
+    Parser["parser.c<br/>(state machine)"]
+
+    Grammar --> Generate --> Parser
+
+    style Grammar fill:#3498db,color:#fff
+    style Generate fill:#9b59b6,color:#fff
+    style Parser fill:#27ae60,color:#fff
 ```
 
 ### 3. Runtime Parsing
@@ -307,6 +341,34 @@ func getDocComment(node *sitter.Node, source []byte) string {
 ## Memory Management
 
 ### CRITICAL: Close Resources
+
+```mermaid
+flowchart TB
+    subgraph Good["Good: Resources Closed"]
+        G1["parser := NewParser()"]
+        G2["defer parser.Close()"]
+        G3["tree := parser.Parse()"]
+        G4["defer tree.Close()"]
+        G5["Process tree..."]
+        G6["Resources freed"]
+
+        G1 --> G2 --> G3 --> G4 --> G5 --> G6
+    end
+
+    subgraph Bad["Bad: Memory Leak"]
+        B1["parser := NewParser()"]
+        B2["tree := parser.Parse()"]
+        B3["Process tree..."]
+        B4["Memory leaked!"]
+
+        B1 --> B2 --> B3 --> B4
+    end
+
+    style Good fill:#27ae60,color:#fff
+    style Bad fill:#e74c3c,color:#fff
+    style G6 fill:#27ae60,color:#fff
+    style B4 fill:#e74c3c,color:#fff
+```
 
 Tree-sitter uses CGO. You MUST close resources:
 

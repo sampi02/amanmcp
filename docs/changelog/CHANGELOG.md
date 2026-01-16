@@ -847,7 +847,6 @@ See [v0.1.24 details](./0.1/v0.1.24.md)
 ### Documentation
 
 - Updated README.md to remove Ollama setup section
-- Updated CLAUDE.md tech stack references
 - Added migration guide for Ollama users
 
 See [v0.1.23 details](./0.1/v0.1.23.md)
@@ -1232,7 +1231,7 @@ See [v0.1.23 details](./0.1/v0.1.23.md)
 
 - F03: File Scanner with comprehensive file discovery
   - Recursive directory traversal with early exclusion
-  - Default exclusions (node_modules, .git, vendor, __pycache__, dist, build)
+  - Default exclusions (node_modules, .git, vendor, **pycache**, dist, build)
   - Sensitive file detection (.env, *.pem, *credentials*, etc.)
   - Binary file detection, gitignore support, symlink handling
   - Language detection (38 languages), content type classification
@@ -1267,7 +1266,6 @@ See [v0.1.23 details](./0.1/v0.1.23.md)
 - Initial project structure and documentation
 - AI-native development workflow
 - Feature catalog with 24 features across 4 phases
-- Claude Code skills and agents
 - CI parity checking scripts
 - Learning guides for core technologies
 - ADR structure and initial decisions
@@ -1276,7 +1274,6 @@ See [v0.1.23 details](./0.1/v0.1.23.md)
 
 ### Documentation
 
-- CLAUDE.md with full workflow integration
 - Strategy and philosophy documents
 - Glossary of project terms
 - Tech debt registry
@@ -1441,7 +1438,6 @@ PATCH: Bug fixes, documentation updates
 [0.8.2]: ./0.8/v0.8.2.md
 [0.3.2]: ./0.3/v0.3.2.md
 [0.3.1]: ./0.3/v0.3.1.md
-[0.3.0]: ./0.3/v0.3.0.md
 [0.2.6]: ./0.2/v0.2.6.md
 [0.2.5]: ./0.2/v0.2.5.md
 [0.2.4]: ./0.2/v0.2.4.md

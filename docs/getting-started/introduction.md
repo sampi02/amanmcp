@@ -89,7 +89,7 @@ This is AST-aware chunking. Your search results are complete thoughts, not arbit
 
 Every component was chosen after evaluating alternatives. Every tradeoff was deliberate. We didn't want clever—we wanted correct.
 
-See [README.md](../README.md) for the complete technology stack and [Architecture](architecture/architecture.md) for detailed design decisions.
+See [README.md](../../README.md) for the complete technology stack and [Architecture](../reference/architecture/architecture.md) for detailed design decisions.
 
 ---
 

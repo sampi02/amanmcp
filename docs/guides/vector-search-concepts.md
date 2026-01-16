@@ -45,20 +45,36 @@ More dimensions = more nuance, but more memory and slower search.
 
 Imagine a 3D space where each point is a document:
 
-```
-        ▲ auth-related
-        │    ● login.go
-        │  ● auth.go
-        │      ● session.go
-        │
-        │
-        │                    ● weather.go
-        ├────────────────────────────────▶ time-related
-       ╱                    ● calendar.go
-      ╱
-     ╱
-    ▼ data-related
-   ● database.go
+```mermaid
+flowchart TB
+    subgraph AuthCluster["Auth Cluster"]
+        login["login.go"]
+        auth["auth.go"]
+        session["session.go"]
+    end
+
+    subgraph DataCluster["Data Cluster"]
+        database["database.go"]
+        cache["cache.go"]
+    end
+
+    subgraph TimeCluster["Time Cluster"]
+        weather["weather.go"]
+        calendar["calendar.go"]
+    end
+
+    login <-.-> auth
+    auth <-.-> session
+
+    database <-.-> cache
+
+    weather <-.-> calendar
+
+    AuthCluster x--x TimeCluster
+
+    style AuthCluster fill:#27ae60,color:#fff
+    style DataCluster fill:#3498db,color:#fff
+    style TimeCluster fill:#9b59b6,color:#fff
 ```
 
 Similar documents cluster together.
@@ -198,35 +214,61 @@ Trade accuracy for speed:
 
 HNSW builds a multi-layer graph for O(log n) search:
 
-```
-Layer 2 (sparse):   A ──────────────────── D
-                     \                    /
-Layer 1 (medium):   A ─── B ────── C ─── D
-                     \   / \      / \   /
-Layer 0 (dense):    A ─ B ─ E ─ F ─ C ─ D
-                        │   │   │   │
-                        G   H   I   J
+```mermaid
+flowchart TB
+    subgraph L2["Layer 2 (Sparse - Long jumps)"]
+        A2[A] ---- D2[D]
+    end
+
+    subgraph L1["Layer 1 (Medium)"]
+        A1[A] --- B1[B] --- C1[C] --- D1[D]
+    end
+
+    subgraph L0["Layer 0 (Dense - All nodes)"]
+        A0[A] --- B0[B] --- E0[E] --- F0[F] --- C0[C] --- D0[D]
+        B0 --- G0[G]
+        E0 --- H0[H]
+        F0 --- I0[I]
+        C0 --- J0[J]
+    end
+
+    A2 --> A1
+    D2 --> D1
+    A1 --> A0
+    B1 --> B0
+    C1 --> C0
+    D1 --> D0
+
+    style L2 fill:#e74c3c,color:#fff
+    style L1 fill:#f39c12,color:#fff
+    style L0 fill:#27ae60,color:#fff
 ```
 
 ### Search Algorithm
 
-```
-Query: Find nearest to Q
+```mermaid
+sequenceDiagram
+    participant Q as Query
+    participant L2 as Layer 2
+    participant L1 as Layer 1
+    participant L0 as Layer 0
+    participant R as Result
 
-1. Start at top layer (sparse)
-   - Entry point: A
-   - Check A's neighbors at this layer
-   - Move to nearest (D is closer)
+    Note over Q: Find nearest to query vector
 
-2. Drop to next layer
-   - From D, check neighbors: C, D's L1 neighbors
-   - C is closest, move there
+    Q->>L2: Start at entry (A)
+    L2->>L2: Check neighbors
+    L2-->>Q: D is closer, move to D
 
-3. Drop to bottom layer
-   - From C, exhaustively check local neighborhood
-   - Find I is actually closest
+    Q->>L1: Drop down from D
+    L1->>L1: Check D's neighbors
+    L1-->>Q: C is closest
 
-4. Return I
+    Q->>L0: Drop to bottom
+    L0->>L0: Exhaustive local search
+    L0-->>Q: I is nearest
+
+    Q->>R: Return I
 ```
 
 ### Why It's Fast
@@ -363,22 +405,19 @@ func StaticEmbed(text string) []float32 {
 
 ### Document → Vector
 
-```
-┌─────────────┐
-│ Source File │
-└──────┬──────┘
-       ▼
-┌─────────────┐
-│  Chunker    │  Tree-sitter splits into functions/types
-└──────┬──────┘
-       ▼
-┌─────────────┐
-│  Embedder   │  Convert each chunk to vector
-└──────┬──────┘
-       ▼
-┌─────────────┐
-│ Vector Index│  Store for fast retrieval
-└─────────────┘
+```mermaid
+flowchart TB
+    Source["Source File"]
+    Chunker["Chunker<br/>tree-sitter splits<br/>into functions/types"]
+    Embedder["Embedder<br/>Convert chunks to vectors"]
+    Index[(Vector Index<br/>Store for retrieval)]
+
+    Source --> Chunker --> Embedder --> Index
+
+    style Source fill:#3498db,color:#fff
+    style Chunker fill:#9b59b6,color:#fff
+    style Embedder fill:#e67e22,color:#fff
+    style Index fill:#27ae60,color:#fff
 ```
 
 ### Batching for Speed
@@ -413,25 +452,22 @@ func (i *Indexer) IndexFiles(files []File) error {
 
 ### Query → Results
 
-```
-Query: "authentication middleware"
-       │
-       ▼
-┌──────────────┐
-│ Embed Query  │  → [0.12, -0.34, ...]
-└──────┬───────┘
-       ▼
-┌──────────────┐
-│ HNSW Search  │  → Find 20 nearest neighbors
-└──────┬───────┘
-       ▼
-┌──────────────┐
-│   Rerank     │  → Optional: reorder by exact similarity
-└──────┬───────┘
-       ▼
-┌──────────────┐
-│   Return     │  → Top 10 chunks with scores
-└──────────────┘
+```mermaid
+flowchart TB
+    Query["Query: 'authentication middleware'"]
+
+    Embed["Embed Query<br/>[0.12, -0.34, ...]"]
+    HNSW["HNSW Search<br/>Find 20 nearest neighbors"]
+    Rerank["Rerank<br/>Reorder by exact similarity"]
+    Return["Return<br/>Top 10 chunks with scores"]
+
+    Query --> Embed --> HNSW --> Rerank --> Return
+
+    style Query fill:#3498db,color:#fff
+    style Embed fill:#9b59b6,color:#fff
+    style HNSW fill:#e67e22,color:#fff
+    style Rerank fill:#f39c12,color:#fff
+    style Return fill:#27ae60,color:#fff
 ```
 
 ### Code Example

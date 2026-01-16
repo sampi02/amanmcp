@@ -63,6 +63,64 @@ make build
 make lint
 ```
 
+### Development Commands
+
+#### Build & Install
+
+| Command | Description |
+|---------|-------------|
+| `make build` | Compile binary to bin/ |
+| `make build-all` | Build all binaries |
+| `make install-local` | Install to ~/.local/bin (recommended) |
+| `make install` | Install to /usr/local/bin |
+| `make install-mlx` | Set up MLX server (Apple Silicon) |
+| `make start-mlx` | Start MLX embedding server |
+| `make uninstall-local` | Remove from ~/.local/bin |
+| `make clean` | Remove build artifacts |
+
+#### Testing
+
+| Command | Description |
+|---------|-------------|
+| `make test` | Run unit tests |
+| `make test-race` | Tests with race detector |
+| `make test-cover` | Generate coverage report |
+| `make test-cover-html` | HTML coverage report |
+
+#### Code Quality
+
+| Command | Description |
+|---------|-------------|
+| `make lint` | Run golangci-lint |
+| `make lint-fix` | Auto-fix lint issues |
+| `make lint-fast` | Lint changed files only |
+
+#### CI Parity
+
+| Command | Description |
+|---------|-------------|
+| `make ci-check` | Full CI validation (run before commits) |
+| `make ci-check-quick` | Fast validation during development |
+
+#### Verification
+
+| Command | Description |
+|---------|-------------|
+| `make verify-all` | Run all verification checks |
+| `make check-versions` | Check version consistency |
+| `make verify-docs` | Check documentation drift |
+
+#### Benchmarks
+
+| Command | Description |
+|---------|-------------|
+| `make bench` | Run all benchmarks |
+| `make bench-search` | Search engine benchmarks |
+| `make bench-compare` | Compare against baseline |
+| `./scripts/benchmark-backends.sh` | Compare MLX vs Ollama |
+
+Run `make help` for complete target list.
+
 ### Project Structure
 
 ```
