@@ -847,7 +847,7 @@ func mockOllamaServerWithTags(t *testing.T, dims int, models []string) *httptest
 		if r.URL.Path == "/api/embed" {
 			body, _ := io.ReadAll(r.Body)
 			var req map[string]any
-			json.Unmarshal(body, &req)
+			_ = json.Unmarshal(body, &req)
 
 			count := 1
 			if input, ok := req["input"].([]any); ok {

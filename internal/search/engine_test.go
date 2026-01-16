@@ -2490,7 +2490,7 @@ func TestEngine_Search_BM25Only_StillAppliesFilters(t *testing.T) {
 	// Add chunks with different types
 	chunk1 := &store.Chunk{ID: "chunk1", Content: "code content", FilePath: "main.go", ContentType: store.ContentTypeCode, Language: "go"}
 	chunk2 := &store.Chunk{ID: "chunk2", Content: "doc content", FilePath: "README.md", ContentType: store.ContentTypeMarkdown}
-	metadata.SaveChunks(context.Background(), []*store.Chunk{chunk1, chunk2})
+	_ = metadata.SaveChunks(context.Background(), []*store.Chunk{chunk1, chunk2})
 
 	bm25.SearchFn = func(ctx context.Context, query string, limit int) ([]*store.BM25Result, error) {
 		return []*store.BM25Result{
@@ -2518,7 +2518,7 @@ func TestEngine_Search_BM25Only_StillAppliesReranking(t *testing.T) {
 
 	chunk1 := &store.Chunk{ID: "chunk1", Content: "first content", FilePath: "a.go", ContentType: store.ContentTypeCode}
 	chunk2 := &store.Chunk{ID: "chunk2", Content: "second content", FilePath: "b.go", ContentType: store.ContentTypeCode}
-	metadata.SaveChunks(context.Background(), []*store.Chunk{chunk1, chunk2})
+	_ = metadata.SaveChunks(context.Background(), []*store.Chunk{chunk1, chunk2})
 
 	bm25.SearchFn = func(ctx context.Context, query string, limit int) ([]*store.BM25Result, error) {
 		return []*store.BM25Result{

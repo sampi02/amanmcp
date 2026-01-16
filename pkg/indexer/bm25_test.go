@@ -524,14 +524,3 @@ func TestBM25Indexer_ImplementsIndexer(t *testing.T) {
 // =============================================================================
 // Helper Functions
 // =============================================================================
-
-func makeChunks(count int) []*store.Chunk {
-	chunks := make([]*store.Chunk, count)
-	for i := 0; i < count; i++ {
-		chunks[i] = &store.Chunk{
-			ID:      "chunk" + string(rune('0'+i%10)),
-			Content: "content for chunk",
-		}
-	}
-	return chunks
-}

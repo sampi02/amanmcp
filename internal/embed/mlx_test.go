@@ -77,7 +77,7 @@ func TestMLXEmbedder_Embed(t *testing.T) {
 				"loaded_model": "large",
 	})
 		case "/models":
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"models": map[string]interface{}{
 					"large": map[string]int{"dimensions": 4096},
 				},
@@ -88,7 +88,7 @@ func TestMLXEmbedder_Embed(t *testing.T) {
 			for i := range embedding {
 				embedding[i] = float64(i) / 4096.0
 			}
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"embedding": embedding,
 			})
 		default:
@@ -132,7 +132,7 @@ func TestMLXEmbedder_EmbedBatch(t *testing.T) {
 				"loaded_model": "large",
 	})
 		case "/models":
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"models": map[string]interface{}{
 					"large": map[string]int{"dimensions": 4096},
 				},
