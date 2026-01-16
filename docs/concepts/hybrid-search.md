@@ -1,6 +1,6 @@
 # Hybrid Search Concepts
 
-**Version:** 1.0.0
+**Version:** 1.0.0  
 **Last Updated:** 2025-12-28
 
 Learn how AmanMCP combines keyword and semantic search for best results.
@@ -26,9 +26,9 @@ flowchart LR
 
     RRF --> Results[Best Results]
 
-    style BM25 fill:#3498db,color:#fff
-    style Vector fill:#9b59b6,color:#fff
-    style RRF fill:#27ae60,color:#fff
+    style BM25 fill:#3498db,stroke:#2980b9,stroke-width:2px
+    style Vector fill:#9b59b6,stroke:#8e44ad,stroke-width:2px
+    style RRF fill:#27ae60,stroke:#229954,stroke-width:2px
 ```
 
 ---
@@ -89,9 +89,9 @@ flowchart TB
 
     Fusion --> Best["Best of both, ranked together"]
 
-    style BM25Result fill:#3498db,color:#fff
-    style VectorResult fill:#9b59b6,color:#fff
-    style Fusion fill:#27ae60,color:#fff
+    style BM25Result fill:#3498db,stroke:#2980b9,stroke-width:2px
+    style VectorResult fill:#9b59b6,stroke:#8e44ad,stroke-width:2px
+    style Fusion fill:#27ae60,stroke:#229954,stroke-width:2px
 ```
 
 ---
@@ -126,6 +126,56 @@ Scores:
 2. Medium (partial match "auth")
 3. Zero (no match)
 ```
+
+### BM25 Algorithm Step-by-Step
+
+```mermaid
+---
+config:
+  layout: elk
+---
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#e1f5ff', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#3498db', 'lineColor': '#3498db', 'secondaryColor': '#c8e6c9', 'tertiaryColor': '#fff4e6'}}}%%
+flowchart TB
+    Start(["Query: authentication"]) --> Tokenize[Tokenize Query]
+    Tokenize --> Tokens["Tokens: authentication"]
+
+    Tokens --> ForEachDoc{For Each<br/>Document}
+
+    ForEachDoc --> CalcTF["Calculate Term Frequency<br/>TF = count in doc"]
+    CalcTF --> GetIDF["Get Inverse Document Frequency<br/>IDF = log of N divided by df"]
+    GetIDF --> GetDocLen["Get Document Length<br/>DL = token count"]
+
+    GetDocLen --> CalcNorm["Calculate Length Normalization<br/>norm = 1 - b + b times DL divided by avgDL"]
+
+    CalcNorm --> CalcBM25Score["Calculate BM25 Score<br/>score = IDF times TF times k1+1<br/>divided by TF + k1 times norm"]
+
+    CalcBM25Score --> AddToTotal["Add to Document Score<br/>docScore += score"]
+
+    AddToTotal --> MoreTerms{More Query<br/>Terms?}
+    MoreTerms -->|Yes| CalcTF
+    MoreTerms -->|No| MoreDocs{More<br/>Documents?}
+
+    MoreDocs -->|Yes| ForEachDoc
+    MoreDocs -->|No| SortResults[Sort Documents by Score]
+
+    SortResults --> Return([Return Ranked Results])
+
+    style Start fill:#3498db,stroke:#2980b9,stroke-width:2px
+    style Tokens fill:#f39c12,stroke:#d68910,stroke-width:2px
+    style CalcTF fill:#9b59b6,stroke:#8e44ad,stroke-width:2px
+    style GetIDF fill:#9b59b6,stroke:#8e44ad,stroke-width:2px
+    style CalcNorm fill:#9b59b6,stroke:#8e44ad,stroke-width:2px
+    style CalcBM25Score fill:#e74c3c,stroke:#c0392b,stroke-width:2px
+    style SortResults fill:#27ae60,stroke:#229954,stroke-width:2px
+    style Return fill:#27ae60,stroke:#229954,stroke-width:2px
+```
+
+**Key Parameters:**
+- `k1 = 1.2` - Term frequency saturation parameter
+- `b = 0.75` - Document length normalization strength
+- `N` - Total number of documents
+- `df` - Number of documents containing term
+- `avgDL` - Average document length
 
 ### In AmanMCP
 
@@ -174,8 +224,8 @@ flowchart LR
         Search --> Results[Similar Docs]
     end
 
-    style Index fill:#e67e22,color:#fff
-    style Query fill:#27ae60,color:#fff
+    style Index fill:#e67e22,stroke:#d35400,stroke-width:2px
+    style Query fill:#27ae60,stroke:#229954,stroke-width:2px
 ```
 
 ### Embeddings
@@ -205,10 +255,10 @@ flowchart TB
         Weather x--x|"far apart"| Auth
     end
 
-    style Auth fill:#27ae60,color:#fff
-    style Login fill:#27ae60,color:#fff
-    style Cred fill:#27ae60,color:#fff
-    style Weather fill:#e74c3c,color:#fff
+    style Auth fill:#27ae60,stroke:#229954,stroke-width:2px
+    style Login fill:#27ae60,stroke:#229954,stroke-width:2px
+    style Cred fill:#27ae60,stroke:#229954,stroke-width:2px
+    style Weather fill:#e74c3c,stroke:#c0392b,stroke-width:2px
 ```
 
 ### HNSW (Hierarchical Navigable Small Worlds)
@@ -303,6 +353,112 @@ The constant k prevents extreme values:
 - High k: Rankings matter less
 - k=60: Good balance, empirically validated
 
+### RRF Algorithm Detailed Example
+
+Step-by-step calculation of RRF fusion with real scores:
+
+```mermaid
+flowchart TB
+    Start([Query: 'authentication']) --> Sources
+
+    subgraph Sources["Input: Two Ranked Lists"]
+        direction TB
+        BM25List["BM25 Results<br/>1. chunk_A (score: 2.5)<br/>2. chunk_B (score: 1.8)<br/>3. chunk_C (score: 1.2)<br/>4. chunk_D (score: 0.9)"]
+        VectorList["Vector Results<br/>1. chunk_C (score: 0.92)<br/>2. chunk_A (score: 0.87)<br/>3. chunk_D (score: 0.81)<br/>4. chunk_B (score: 0.75)"]
+    end
+
+    Sources --> RRFCalc
+
+    subgraph RRFCalc["RRF Score Calculation (k=60, weights: BM25=0.35, Vector=0.65)"]
+        direction TB
+
+        ChunkA["chunk_A:<br/>BM25 rank: 1 → 0.35/(60+1) = 0.00574<br/>Vector rank: 2 → 0.65/(60+2) = 0.01048<br/>RRF score: 0.01622"]
+
+        ChunkB["chunk_B:<br/>BM25 rank: 2 → 0.35/(60+2) = 0.00565<br/>Vector rank: 4 → 0.65/(60+4) = 0.01016<br/>RRF score: 0.01581"]
+
+        ChunkC["chunk_C:<br/>BM25 rank: 3 → 0.35/(60+3) = 0.00556<br/>Vector rank: 1 → 0.65/(60+1) = 0.01066<br/>RRF score: 0.01622"]
+
+        ChunkD["chunk_D:<br/>BM25 rank: 4 → 0.35/(60+4) = 0.00547<br/>Vector rank: 3 → 0.65/(60+3) = 0.01032<br/>RRF score: 0.01579"]
+    end
+
+    RRFCalc --> Sort
+
+    subgraph Sort["Sort by RRF Score"]
+        direction TB
+        Sorted["Final Ranking:<br/>1. chunk_A (0.01622) ← Best BM25 + good Vector<br/>2. chunk_C (0.01622) ← Best Vector + good BM25<br/>3. chunk_D (0.01579)<br/>4. chunk_B (0.01581)"]
+    end
+
+    Sort --> Insight
+
+    subgraph Insight["Why This Works"]
+        direction TB
+        Explain["
+        • chunk_A: #1 in BM25, #2 in Vector → Strong overall
+        • chunk_C: #1 in Vector, #3 in BM25 → Strong overall
+        • Both get boosted by appearing high in both lists
+
+        • chunk_B: #2 in BM25, but #4 in Vector → Mixed signals
+        • chunk_D: #4 in BM25, #3 in Vector → Mixed signals
+
+        Key insight: RRF rewards consistency across sources
+        Documents that rank well in BOTH get highest scores
+        "]
+    end
+
+    subgraph KEffect["Effect of k Parameter"]
+        direction TB
+        KTable["
+        If k=10 (low):
+        • Rank 1: 1/(10+1) = 0.091 (very high)
+        • Rank 10: 1/(10+10) = 0.050 (still significant)
+        • Top ranks dominate too much
+
+        If k=60 (balanced):
+        • Rank 1: 1/(60+1) = 0.016
+        • Rank 10: 1/(60+10) = 0.014
+        • Smooth decay, all ranks contribute
+
+        If k=200 (high):
+        • Rank 1: 1/(200+1) = 0.005
+        • Rank 10: 1/(200+10) = 0.005
+        • Ranks matter less, almost uniform
+        "]
+    end
+
+    Insight --> KEffect
+
+    style Start fill:#3498db,stroke:#2980b9,stroke-width:2px
+    style Sources fill:#e1f5ff
+    style RRFCalc fill:#fff9c4
+    style ChunkA fill:#c8e6c9
+    style ChunkC fill:#c8e6c9
+    style ChunkB fill:#ffe0b2
+    style ChunkD fill:#ffe0b2
+    style Sort fill:#27ae60,stroke:#229954,stroke-width:2px
+    style Sorted fill:#27ae60,stroke:#229954,stroke-width:2px
+    style Insight fill:#e1f5ff
+    style KEffect fill:#f3e5f5
+```
+
+**Formula:**
+
+```
+RRF_score(doc) = Σ weight_i / (k + rank_i(doc))
+
+where:
+  i ∈ {BM25, Vector}
+  weight_BM25 = 0.35
+  weight_Vector = 0.65
+  k = 60
+  rank_i(doc) = position of doc in source i (1-indexed)
+```
+
+**Properties:**
+- **Scale-free**: Works regardless of original score ranges
+- **Rank-based**: Only position matters, not absolute scores
+- **Weighted**: Different importance for different sources
+- **Smooth**: Constant k smooths rank differences
+
 ---
 
 ## Query Classification
@@ -317,6 +473,69 @@ Identifiers         0.7     0.3     (technical terms)
 Mixed               0.5     0.5     (balanced)
 Natural language    0.25    0.75    (need meaning)
 ```
+
+### Query Classification Decision Tree
+
+```mermaid
+flowchart TB
+    Start([Incoming Query]) --> CheckQuoted{Quoted<br/>Phrase?}
+
+    CheckQuoted -->|Yes: exact match| Quoted["BM25: 0.9<br/>Vector: 0.1"]
+    CheckQuoted -->|No| CheckError{Error Code<br/>Pattern?}
+
+    CheckError -->|Yes: error codes| ErrorCode["BM25: 0.8<br/>Vector: 0.2"]
+    CheckError -->|No| CheckIdentifier{Code<br/>Identifier?}
+
+    CheckIdentifier -->|CamelCase| CamelCase["BM25: 0.7<br/>Vector: 0.3"]
+    CheckIdentifier -->|snake_case| SnakeCase["BM25: 0.7<br/>Vector: 0.3"]
+    CheckIdentifier -->|SCREAMING_SNAKE| Constant["BM25: 0.75<br/>Vector: 0.25"]
+    CheckIdentifier -->|No| CheckNatural{Natural<br/>Language?}
+
+    CheckNatural -->|Contains: how, what, why| Question["BM25: 0.25<br/>Vector: 0.75"]
+    CheckNatural -->|Word count > 5| Sentence["BM25: 0.3<br/>Vector: 0.7"]
+    CheckNatural -->|No| CheckMixed{Mixed<br/>Content?}
+
+    CheckMixed -->|Has code + text| Mixed["BM25: 0.5<br/>Vector: 0.5"]
+    CheckMixed -->|Pure technical| Technical["BM25: 0.6<br/>Vector: 0.4"]
+    CheckMixed -->|Default| Default["BM25: 0.5<br/>Vector: 0.5"]
+
+    Quoted --> ApplyWeights[Apply Weights to Search]
+    ErrorCode --> ApplyWeights
+    CamelCase --> ApplyWeights
+    SnakeCase --> ApplyWeights
+    Constant --> ApplyWeights
+    Question --> ApplyWeights
+    Sentence --> ApplyWeights
+    Mixed --> ApplyWeights
+    Technical --> ApplyWeights
+    Default --> ApplyWeights
+
+    ApplyWeights --> Execute[Execute Hybrid Search]
+    Execute --> Results([Weighted Results])
+
+    style Start fill:#3498db,stroke:#2980b9,stroke-width:2px
+    style Quoted fill:#e74c3c,stroke:#c0392b,stroke-width:2px
+    style ErrorCode fill:#e74c3c,stroke:#c0392b,stroke-width:2px
+    style CamelCase fill:#9b59b6,stroke:#8e44ad,stroke-width:2px
+    style SnakeCase fill:#9b59b6,stroke:#8e44ad,stroke-width:2px
+    style Constant fill:#9b59b6,stroke:#8e44ad,stroke-width:2px
+    style Question fill:#27ae60,stroke:#229954,stroke-width:2px
+    style Sentence fill:#27ae60,stroke:#229954,stroke-width:2px
+    style Mixed fill:#f39c12,stroke:#d68910,stroke-width:2px
+    style Technical fill:#f39c12,stroke:#d68910,stroke-width:2px
+    style Default fill:#95a5a6,stroke:#7f8c8d,stroke-width:2px
+    style ApplyWeights fill:#3498db,stroke:#2980b9,stroke-width:2px
+    style Execute fill:#3498db,stroke:#2980b9,stroke-width:2px
+    style Results fill:#27ae60,stroke:#229954,stroke-width:2px
+```
+
+**Classification Priority (top to bottom):**
+1. Quoted phrases → Exact match (BM25-heavy)
+2. Error codes → Technical precision (BM25-heavy)
+3. Code identifiers → Structural match (BM25-heavy)
+4. Natural language → Semantic understanding (Vector-heavy)
+5. Mixed content → Balanced approach
+6. Default → Balanced (0.5/0.5)
 
 ### Classification Patterns
 
@@ -358,7 +577,7 @@ flowchart TB
     Query["Query: 'authentication middleware'"]
 
     Query --> Classifier["Query Classifier"]
-    Classifier -->|"Weights: 0.5, 0.5"| Split
+    Classifier -->|Weights: 0.5, 0.5| Split
 
     Split --> BM25["BM25 Search<br/>Keyword"]
     Split --> Vector["Vector Search<br/>Semantic"]
@@ -368,12 +587,12 @@ flowchart TB
 
     RRF --> Final["Final Results"]
 
-    style Query fill:#3498db,color:#fff
-    style Classifier fill:#f39c12,color:#fff
-    style BM25 fill:#9b59b6,color:#fff
-    style Vector fill:#9b59b6,color:#fff
-    style RRF fill:#27ae60,color:#fff
-    style Final fill:#27ae60,color:#fff
+    style Query fill:#3498db,stroke:#2980b9,stroke-width:2px
+    style Classifier fill:#f39c12,stroke:#d68910,stroke-width:2px
+    style BM25 fill:#9b59b6,stroke:#8e44ad,stroke-width:2px
+    style Vector fill:#9b59b6,stroke:#8e44ad,stroke-width:2px
+    style RRF fill:#27ae60,stroke:#229954,stroke-width:2px
+    style Final fill:#27ae60,stroke:#229954,stroke-width:2px
 ```
 
 ```mermaid

@@ -1,11 +1,13 @@
 # Observability for RAG Systems: When to Apply AI Best Practices
 
 > **Learning Objectives:**
+>
 > - Understand the difference between agentic AI and RAG pipelines
 > - Learn how to critically evaluate industry recommendations
 > - Apply appropriate observability for different system types
 >
 > **Prerequisites:**
+>
 > - Basic understanding of RAG (Retrieval Augmented Generation)
 > - Familiarity with logging and telemetry concepts
 >
@@ -42,6 +44,43 @@ The article resonates because it identifies a real problem: when an LLM decides 
 
 ## The Key Distinction: Agents vs RAG
 
+Visual comparison of system types and their observability needs:
+
+```mermaid
+---
+config:
+  layout: elk
+  look: neo
+  theme: neo
+---
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#2563eb','primaryTextColor':'#fff','primaryBorderColor':'#1e40af','lineColor':'#64748b','fontSize':'14px'}}}%%
+graph TB
+    subgraph Agents["🤖 AI Agents · Need Full Traces"]
+        A1["Non-deterministic<br/>runtime decisions"]
+        A2["Multi-step<br/>reasoning chains"]
+        A3["Model chooses<br/>tools dynamically"]
+        A4["Different paths<br/>each run"]
+        A5["✅ Needs: LangSmith/Langfuse<br/>Full trace platforms"]
+
+        A1 --> A2 --> A3 --> A4 --> A5
+    end
+
+    subgraph RAG["📚 RAG Pipelines · Metrics Sufficient"]
+        R1["Deterministic<br/>fixed pipeline"]
+        R2["Same steps<br/>every query"]
+        R3["Reproducible<br/>results"]
+        R4["Predictable<br/>branching"]
+        R5["✅ Needs: Metrics + Logs<br/>Structured logging"]
+
+        R1 --> R2 --> R3 --> R4 --> R5
+    end
+
+    style A5 fill:#dc2626,stroke:#b91c1c,stroke-width:3px,color:#fff
+    style R5 fill:#059669,stroke:#047857,stroke-width:3px,color:#fff
+    style A1 fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:#fff
+    style R1 fill:#2563eb,stroke:#1e40af,stroke-width:2px,color:#fff
+```
+
 ### AI Agents: Non-Deterministic
 
 Agentic systems have these characteristics:
@@ -72,6 +111,7 @@ User Query -> BM25 Search + Vector Search -> RRF Fusion -> Results
 ```
 
 The "intelligence" in a RAG system comes from:
+
 1. **Embedding models** - deterministic given weights (no temperature)
 2. **BM25 scoring** - deterministic algorithm
 3. **RRF fusion** - fixed formula (k=60)
@@ -117,6 +157,7 @@ The execution path is invisible without traces.
 ### 3. Autonomous Loops
 
 Systems that run without human intervention need traces to understand:
+
 - Why did it decide to stop?
 - What triggered the error recovery?
 - How did it handle the edge case?
@@ -176,6 +217,7 @@ type QueryMetrics struct {
 ```
 
 This tells us:
+
 - **What's being searched:** Query type distribution
 - **What's failing:** Zero-result queries for improvement
 - **How fast:** Latency percentiles
@@ -212,6 +254,7 @@ To reproduce: run the same query. You'll get the same results. No trace needed.
 ### 1. Consider the Source's Context
 
 LangChain builds agent tooling. Their products include:
+
 - LangSmith (trace platform)
 - LangGraph (agent framework)
 - Templates for agentic applications
@@ -244,7 +287,49 @@ Distributed system:  Logging + Metrics + Basic Tracing
 Agent system:        Full Observability Platform
 ```
 
+#### Observability Complexity Ladder
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#2563eb','primaryTextColor':'#fff','primaryBorderColor':'#1e40af','lineColor':'#64748b','fontSize':'14px'}}}%%
+graph TB
+    subgraph Level1["Level 1 · Simple Function"]
+        L1A["Basic Logging"] --> L1B["stdout/stderr"]
+        L1B --> L1C["Cost: Minimal<br/>Value: Debug basics"]
+    end
+
+    subgraph Level2["Level 2 · Microservice"]
+        L2A["Structured Logging<br/>+ Metrics"] --> L2B["JSON logs<br/>Prometheus"]
+        L2B --> L2C["Cost: Low<br/>Value: Performance tracking"]
+    end
+
+    subgraph Level3["Level 3 · Distributed System"]
+        L3A["Logging + Metrics<br/>+ Basic Tracing"] --> L3B["OpenTelemetry<br/>Jaeger/Zipkin"]
+        L3B --> L3C["Cost: Medium<br/>Value: Cross-service debugging"]
+    end
+
+    subgraph Level4["Level 4 · AI Agent"]
+        L4A["Full Observability<br/>Platform"] --> L4B["LangSmith<br/>Langfuse"]
+        L4B --> L4C["Cost: High<br/>Value: Model decision tracking"]
+    end
+
+    subgraph RAG["✅ RAG Systems · Level 2"]
+        R1["Metrics + Logs"] --> R2["Query patterns<br/>Zero-result tracking<br/>Latency histograms"]
+        R2 --> R3["Cost: Low<br/>Value: Quality + performance"]
+    end
+
+    Level1 --> Level2
+    Level2 --> Level3
+    Level3 --> Level4
+
+    style L1C fill:#059669,stroke:#047857,stroke-width:2px,color:#fff
+    style L2C fill:#059669,stroke:#047857,stroke-width:3px,color:#fff
+    style L3C fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:#fff
+    style L4C fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#fff
+    style R3 fill:#059669,stroke:#047857,stroke-width:3px,color:#fff
+```
+
 Over-engineering observability has costs:
+
 - **Integration overhead:** Platforms require setup, maintenance
 - **Runtime overhead:** Traces add latency and storage
 - **Cognitive overhead:** More data to interpret
@@ -263,6 +348,47 @@ For a RAG system, the key questions are:
 
 None of these require per-request execution traces.
 
+#### RAG vs Agent Observability Needs
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#2563eb','primaryTextColor':'#fff','primaryBorderColor':'#1e40af','lineColor':'#64748b','fontSize':'14px'}}}%%
+graph TB
+    subgraph AgentNeeds["🤖 AI Agent Needs"]
+        A1["Question: Why did agent<br/>choose Tool X?"] --> A2["Answer: Full trace<br/>of model decisions"]
+        A3["Question: Why did<br/>loop terminate?"] --> A4["Answer: State<br/>accumulation trace"]
+        A5["Question: What caused<br/>unexpected path?"] --> A6["Answer: Per-turn<br/>reasoning logs"]
+        A7["✅ Needs: LangSmith/Langfuse"]
+    end
+
+    subgraph RAGNeeds["📚 RAG Needs"]
+        R1["Question: Why no<br/>results?"] --> R2["Answer: BM25 terms<br/>+ vector similarity"]
+        R3["Question: Why<br/>slow?"] --> R4["Answer: Latency<br/>histogram"]
+        R5["Question: What are users<br/>searching?"] --> R6["Answer: Query term<br/>aggregation"]
+        R7["✅ Needs: Metrics + Logs"]
+    end
+
+    subgraph Comparison["Key Difference"]
+        C1["Agent: Non-deterministic<br/>Code doesn't document behavior"]
+        C2["RAG: Deterministic<br/>Code IS the documentation"]
+    end
+
+    A2 --> A7
+    A4 --> A7
+    A6 --> A7
+
+    R2 --> R7
+    R4 --> R7
+    R6 --> R7
+
+    A7 --> C1
+    R7 --> C2
+
+    style A7 fill:#dc2626,stroke:#b91c1c,stroke-width:3px,color:#fff
+    style R7 fill:#059669,stroke:#047857,stroke-width:3px,color:#fff
+    style C1 fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:#fff
+    style C2 fill:#059669,stroke:#047857,stroke-width:3px,color:#fff
+```
+
 ---
 
 ## What We Chose NOT to Implement
@@ -270,6 +396,7 @@ None of these require per-request execution traces.
 ### Full LangSmith/Langfuse Integration
 
 **Why not:** AmanMCP is local-first and privacy-focused. Cloud observability platforms:
+
 - Send query data to external servers
 - Require internet connectivity
 - Add external dependencies
@@ -282,6 +409,7 @@ None of these require per-request execution traces.
 ### OpenTelemetry Integration
 
 **Why not:** OTEL is powerful but complex. For a deterministic pipeline:
+
 - Integration cost exceeds benefit
 - Standard logging achieves the same goals
 - Profiling tools (pprof) handle performance
@@ -289,6 +417,7 @@ None of these require per-request execution traces.
 ### Replay Debugging Infrastructure
 
 **Why not:** Replay debugging captures inputs and outputs to reproduce agent behavior later. For RAG:
+
 - Same query + same index = same results
 - No special infrastructure needed
 - Just run the query again
@@ -343,8 +472,3 @@ The goal is observability that matches your system's complexity - not observabil
 - [Hybrid Search](../concepts/hybrid-search.md) - How RAG search pipelines work
 - [Vector Search Concepts](../concepts/vector-search-concepts.md) - Understanding semantic search
 - [Embedding Models](./embedding-models.md) - Model selection for RAG
-
----
-
-**Original Analysis:** `archive/research/2026-01-11-ai-observability-analysis.md`
-**Last Updated:** 2026-01-16

@@ -58,10 +58,10 @@ flowchart LR
 
     Test --> Result["Returns test file ❌"]
 
-    style Query fill:#3498db,color:#fff
-    style Test fill:#e74c3c,color:#fff
-    style Impl fill:#27ae60,color:#fff
-    style Result fill:#e74c3c,color:#fff
+    style Query fill:#3498db,stroke-width:2px
+    style Test fill:#e74c3c,stroke-width:2px
+    style Impl fill:#27ae60,stroke-width:2px
+    style Result fill:#e74c3c,stroke-width:2px
 
     linkStyle 3 stroke:#e74c3c,stroke-width:3px
     linkStyle 4 stroke:#27ae60,stroke-width:1px,stroke-dasharray:5
@@ -105,10 +105,10 @@ flowchart LR
     M1 --> R[(Results Matrix)]
     M2 --> R
 
-    style B1 fill:#e74c3c,color:#fff
-    style B2 fill:#f39c12,color:#fff
-    style M1 fill:#3498db,color:#fff
-    style M2 fill:#9b59b6,color:#fff
+    style B1 fill:#e74c3c,stroke-width:2px
+    style B2 fill:#f39c12,stroke-width:2px
+    style M1 fill:#3498db,stroke-width:2px
+    style M2 fill:#9b59b6,stroke-width:2px
 ```
 
 ```bash
@@ -184,9 +184,9 @@ flowchart LR
     OllamaEmbed --> Result
     Static --> Result
 
-    style MLXEmbed fill:#22a6b3,stroke:#fff,color:#fff
-    style OllamaEmbed fill:#f0932b,stroke:#fff,color:#fff
-    style Static fill:#eb4d4b,stroke:#fff,color:#fff
+    style MLXEmbed fill:#22a6b3,stroke:#fff,stroke-width:2px
+    style OllamaEmbed fill:#f0932b,stroke:#fff,stroke-width:2px
+    style Static fill:#eb4d4b,stroke:#fff,stroke-width:2px
 ```
 
 If MLX server isn't running, fall back to Ollama. If Ollama isn't installed, use static hashing (always works, lower quality). The system never fails completely.
@@ -208,10 +208,10 @@ flowchart LR
     RRF --> Rerank["Cross-Encoder<br/>Reranking"]
     Rerank --> Results[/"Final Results"/]
 
-    style BM25 fill:#6c5ce7,stroke:#fff,color:#fff
-    style Vector fill:#00b894,stroke:#fff,color:#fff
-    style RRF fill:#fdcb6e,stroke:#2d3436,color:#2d3436
-    style Rerank fill:#e17055,stroke:#fff,color:#fff
+    style BM25 fill:#6c5ce7,stroke:#fff,stroke-width:2px
+    style Vector fill:#00b894,stroke:#fff,stroke-width:2px
+    style RRF fill:#fdcb6e,stroke:#2d3436,stroke-width:2px
+    style Rerank fill:#e17055,stroke:#fff,stroke-width:2px
 ```
 
 ```go
@@ -252,8 +252,8 @@ flowchart LR
     CE --> Bad[Limited context]
     BE --> Good[Full context]
 
-    style Bad fill:#e74c3c,color:#fff
-    style Good fill:#27ae60,color:#fff
+    style Bad fill:#e74c3c,stroke-width:2px
+    style Good fill:#27ae60,stroke-width:2px
 ```
 
 1. **Training data matters**: A model trained specifically for embedding might beat a general-purpose model with more parameters.
@@ -289,13 +289,13 @@ flowchart LR
     Full -.->|truncate| Truncated
     Truncated -.->|truncate| Compact
 
-    style F1 fill:#27ae60,color:#fff
-    style F2 fill:#2ecc71,color:#fff
-    style F3 fill:#82e0aa,color:#000
-    style F4 fill:#d5f4e6,color:#000
-    style T1 fill:#27ae60,color:#fff
-    style T2 fill:#2ecc71,color:#fff
-    style C1 fill:#27ae60,color:#fff
+    style F1 fill:#27ae60,stroke-width:2px
+    style F2 fill:#2ecc71,stroke-width:2px
+    style F3 fill:#82e0aa,stroke-width:2px
+    style F4 fill:#d5f4e6,stroke-width:2px
+    style T1 fill:#27ae60,stroke-width:2px
+    style T2 fill:#2ecc71,stroke-width:2px
+    style C1 fill:#27ae60,stroke-width:2px
 ```
 
 **Key insight**: The most important information is packed into the first dimensions. Truncating loses only fine details.

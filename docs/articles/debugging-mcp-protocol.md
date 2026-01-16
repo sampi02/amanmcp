@@ -21,6 +21,24 @@
 
 When your MCP server fails to connect with no useful error message, check if anything writes to stdout before the JSON-RPC handshake. Even a single status message, emoji, or warning printed to stdout will corrupt the protocol stream. The fix is architectural: create a logging mode that guarantees file-only output during protocol operation.
 
+```mermaid
+graph LR
+    A[MCP Server Starts] -->|❌ BAD| B[Print to stdout]
+    B --> C[Start JSON-RPC]
+    C --> D[Client Receives Mixed Stream]
+    D --> E[Connection Failed]
+
+    A -->|✅ GOOD| F[Setup File Logging]
+    F --> G[Start JSON-RPC]
+    G --> H[Clean stdout Stream]
+    H --> I[Connection Success]
+
+    style B fill:#ffccbc
+    style E fill:#ffccbc
+    style F fill:#c8e6c9
+    style I fill:#c8e6c9
+```
+
 ---
 
 ## The Mystery
@@ -110,6 +128,34 @@ fmt.Fprintf(os.Stderr, "OllamaEmbedder unavailable: %v, using static fallback\n"
 
 Even stderr was being captured by the MCP client. Any output to either stdout or stderr before the protocol handshake would corrupt the stream.
 
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffccbc', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#e74c3c', 'lineColor': '#e74c3c', 'secondaryColor': '#c8e6c9', 'tertiaryColor': '#e1f5ff'}}}%%
+sequenceDiagram
+    participant Client as Claude Code
+    participant Server as amanmcp
+
+    Note over Server: WRONG: Stdout Contamination
+
+    Server->>Client: Add to your AI assistant config:<br/>{...JSON example...}<br/>Starting MCP server...
+    Note over Client: Parse error!<br/>Expected JSON-RPC
+    Client->>Server: ❌ Failed to connect
+
+    rect rgb(255, 204, 188)
+        Note over Server,Client: First bytes must be valid JSON-RPC
+    end
+
+    Note over Server: CORRECT: Clean stdout
+
+    Server->>Client: {"jsonrpc":"2.0","method":"initialize"...}
+    Note over Client: ✅ Valid JSON-RPC
+    Client->>Server: {"jsonrpc":"2.0","result":{...}}
+    Note over Server,Client: Handshake complete
+
+    rect rgb(200, 230, 201)
+        Note over Server,Client: Protocol intact from first byte
+    end
+```
+
 ---
 
 ## Root Cause: The "5 Whys"
@@ -132,6 +178,41 @@ Root cause analysis using the "5 Whys" technique revealed the true source of the
 - **Because logging was ad-hoc (`fmt.Fprintf`, `output.Writer`) rather than centralized with MCP-awareness**
 
 The root cause was not a bug in one line of code. It was an architectural gap: the logging system had no concept of "MCP mode" where stdout and stderr must remain pristine.
+
+```mermaid
+graph TD
+    Q1["❓ Why: Failed to connect?"]
+    A1["Non-JSON data in stream"]
+
+    Q2["❓ Why: Non-JSON in stream?"]
+    A2["Status messages to stdout"]
+
+    Q3["❓ Why: Messages to stdout?"]
+    A3["output.Writer before runServe"]
+
+    Q4["❓ Why: Not caught in tests?"]
+    A4["No end-to-end protocol tests"]
+
+    Q5["❓ Why: No protocol enforcement?"]
+    ROOT["🎯 ROOT CAUSE:<br/>Ad-hoc logging without<br/>MCP-awareness"]
+
+    Q1 --> A1
+    A1 --> Q2
+    Q2 --> A2
+    A2 --> Q3
+    Q3 --> A3
+    A3 --> Q4
+    Q4 --> A4
+    A4 --> Q5
+    Q5 --> ROOT
+
+    style ROOT fill:#ffe0b2
+    style Q1 fill:#e1f5ff
+    style Q2 fill:#e1f5ff
+    style Q3 fill:#e1f5ff
+    style Q4 fill:#e1f5ff
+    style Q5 fill:#e1f5ff
+```
 
 ---
 
@@ -226,6 +307,34 @@ All diagnostic information now goes to `~/.amanmcp/logs/server.log`:
 {"time":"2026-01-04T20:52:11","level":"INFO","msg":"MCP server ready","transport":"stdio"}
 ```
 
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#c8e6c9', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#27ae60', 'lineColor': '#27ae60', 'secondaryColor': '#e1f5ff', 'tertiaryColor': '#fff9c4'}}}%%
+graph LR
+    subgraph Before["BEFORE: Ad-hoc Logging"]
+        B1[Code Path 1<br/>fmt.Printf] --> BStdout[stdout<br/>Contaminated]
+        B2[Code Path 2<br/>output.Writer] --> BStdout
+        B3[Code Path 3<br/>fmt.Fprintf stderr] --> BStderr[stderr<br/>Captured by MCP]
+        BStdout --> BResult[❌ Protocol Broken]
+        BStderr --> BResult
+    end
+
+    subgraph After["AFTER: MCP-Safe Logging"]
+        A1[logging.SetupMCPMode] --> AMode[File-Only Mode<br/>~/.amanmcp/logs/]
+        AMode --> A2[All Code Paths<br/>slog.Info/Debug/Warn]
+        A2 --> AStdout[stdout<br/>PRISTINE]
+        A2 --> AFile[server.log<br/>All diagnostics]
+        AStdout --> AResult[✅ Protocol Clean]
+    end
+
+    style BResult fill:#ffccbc,stroke:#e74c3c,stroke-width:3px
+    style AResult fill:#c8e6c9,stroke:#27ae60,stroke-width:3px
+    style BStdout fill:#ffe0b2,stroke:#f39c12,stroke-width:2px
+    style BStderr fill:#ffe0b2,stroke:#f39c12,stroke-width:2px
+    style AStdout fill:#c8e6c9,stroke:#27ae60,stroke-width:2px
+    style AFile fill:#e1f5ff,stroke:#3498db,stroke-width:2px
+    style AMode fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+```
+
 ---
 
 ## Lessons for Protocol Implementers
@@ -288,6 +397,31 @@ fmt.Printf("Debug: %v\n", value)  // Who knows where this goes?
 ## Debugging Checklist for Protocol Issues
 
 When your protocol server fails to connect, work through this checklist:
+
+```mermaid
+graph TD
+    START[Connection Failed] --> CHECK1{First byte<br/>is JSON?}
+
+    CHECK1 -->|No| FIX1["🔧 Stdout contamination<br/>Remove prints before protocol"]
+    CHECK1 -->|Yes| CHECK2{Works with<br/>minimal client?}
+
+    CHECK2 -->|No| FIX2["🔧 Protocol implementation<br/>Check JSON-RPC format"]
+    CHECK2 -->|Yes| CHECK3{Startup<br/>warnings?}
+
+    CHECK3 -->|Yes| FIX3["🔧 Fallback handlers<br/>Move to file logging"]
+    CHECK3 -->|No| CHECK4{Third-party<br/>stdout writes?}
+
+    CHECK4 -->|Yes| FIX4["🔧 Library audit<br/>Redirect or patch"]
+    CHECK4 -->|No| DEEP["🔍 Deep dive:<br/>Integration tests,<br/>byte-level inspection"]
+
+    style START fill:#ffccbc
+    style FIX1 fill:#c8e6c9
+    style FIX2 fill:#c8e6c9
+    style FIX3 fill:#c8e6c9
+    style FIX4 fill:#c8e6c9
+    style DEEP fill:#ffe0b2
+```
+
 
 ### Immediate Checks
 

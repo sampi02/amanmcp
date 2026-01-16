@@ -1,11 +1,13 @@
 # TDD as Mandatory Practice: Why Test-First in AI Development
 
 > **Learning Objectives:**
+>
 > - Understand why TDD is especially important for AI-assisted development
 > - Learn the RED-GREEN-REFACTOR-LINT-CI cycle
 > - Apply the testing pyramid for effective test coverage
 >
 > **Prerequisites:**
+>
 > - Basic familiarity with unit testing
 > - Understanding of Go testing (`go test`)
 >
@@ -49,6 +51,43 @@ AmanMCP uses an extended TDD cycle that includes quality gates:
 
 ```
 RED --> GREEN --> REFACTOR --> LINT --> CI-CHECK
+```
+
+```mermaid
+stateDiagram-v2
+    [*] --> RED
+    RED --> GREEN: Test passes
+    GREEN --> REFACTOR: Code works
+    REFACTOR --> LINT: Code clean
+    LINT --> CI: No warnings
+    CI --> [*]: All gates pass
+    CI --> RED: Add next feature
+
+    RED: RED<br/>Write Failing Test<br/>(Must fail to validate)
+    GREEN: GREEN<br/>Minimum Code to Pass<br/>(No premature optimization)
+    REFACTOR: REFACTOR<br/>Clean Up Code<br/>(Tests still green)
+    LINT: LINT<br/>Run make lint<br/>(Fix all warnings)
+    CI: CI-CHECK<br/>Run make ci-check<br/>(Exit code 0 required)
+
+    note right of RED
+        Start here for every feature
+        Test must fail initially
+    end note
+
+    note right of GREEN
+        Write simplest code
+        Resist adding extras
+    end note
+
+    note right of REFACTOR
+        Only when tests pass
+        Run tests after each change
+    end note
+
+    note right of CI
+        Final validation gate
+        Race detector + coverage
+    end note
 ```
 
 ### Step by Step
@@ -113,6 +152,7 @@ make ci-check
 ```
 
 This must exit with code 0. It validates:
+
 - All tests pass with race detector
 - Coverage meets threshold (25%+)
 - No lint warnings
@@ -130,6 +170,10 @@ Not all tests are equal. Follow this distribution:
 | **Integration Tests** | 15% | Real dependencies, slower | Seconds |
 | **E2E Tests** | 5% | Full system validation | Minutes |
 
+![Testing Pyramid](./images/testing-pyramid.png)
+
+**Key Insight:** The wider the base, the faster feedback. Unit tests give you instant confidence.
+
 ### Why This Ratio?
 
 - **Unit tests** are fast - run them constantly
@@ -146,6 +190,40 @@ A feature is NOT complete until all gates pass:
 # The single command that validates everything
 make ci-check  # Must exit 0
 ```
+
+```mermaid
+flowchart LR
+    START([Code Change]) --> BUILD{Build<br/>Succeeds?}
+    BUILD -->|No| FAIL1[❌ Fix Build Errors]
+    BUILD -->|Yes| TESTS{All Tests<br/>Pass with<br/>Race Detector?}
+
+    TESTS -->|No| FAIL2[❌ Fix Failing Tests]
+    TESTS -->|Yes| COVERAGE{Coverage<br/>≥ 25%?}
+
+    COVERAGE -->|No| FAIL3[❌ Add More Tests]
+    COVERAGE -->|Yes| LINT{Lint<br/>Clean?}
+
+    LINT -->|No| FAIL4[❌ Fix Lint Warnings]
+    LINT -->|Yes| MERGE([✅ Ready to Merge])
+
+    FAIL1 --> BUILD
+    FAIL2 --> TESTS
+    FAIL3 --> COVERAGE
+    FAIL4 --> LINT
+
+    style START fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style MERGE fill:#c8e6c9,stroke:#388e3c,stroke-width:3px
+    style FAIL1 fill:#ffcdd2,stroke:#c62828,stroke-width:2px
+    style FAIL2 fill:#ffcdd2,stroke:#c62828,stroke-width:2px
+    style FAIL3 fill:#ffcdd2,stroke:#c62828,stroke-width:2px
+    style FAIL4 fill:#ffcdd2,stroke:#c62828,stroke-width:2px
+    style BUILD fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style TESTS fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style COVERAGE fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style LINT fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+```
+
+**Critical:** Each gate must pass before proceeding. `make ci-check` validates all gates with a single command.
 
 ### What ci-check Validates
 
@@ -190,42 +268,18 @@ For complex features, follow this detailed loop:
 ### The Hidden Cost of "Test After"
 
 When you write tests after implementation:
+
 - Tests are shaped to match the code (not requirements)
 - Edge cases are forgotten
 - Coverage is often incomplete
 - Tests become a chore, not a design tool
 
 With TDD:
+
 - Tests reflect requirements
 - Edge cases emerge naturally
 - Coverage is built-in
 - Tests improve your design
-
----
-
-## For AI Developers
-
-### Invoking TDD Mode
-
-When implementing features with Claude Code, load the TDD skill:
-
-```
-Skill(skill: "tdd-workflow")
-```
-
-This loads context that enforces the TDD cycle and reminds the AI to:
-- Write tests first
-- Run tests after each change
-- Not mark features complete until CI passes
-
-### Why AI Needs TDD Constraints
-
-Without explicit constraints:
-- AI optimizes for showing working code quickly
-- Tests seem like "extra work" to skip
-- The AI's tendency to please leads to shortcuts
-
-TDD provides structure that makes correct behavior the easy path.
 
 ---
 
@@ -240,11 +294,13 @@ TDD provides structure that makes correct behavior the easy path.
 ### Mistake 1: Writing Test and Implementation Together
 
 **Wrong:**
+
 ```
 Write test -> Write implementation -> Commit
 ```
 
 **Right:**
+
 ```
 Write test -> Run test (must fail) -> Write implementation -> Run test (must pass)
 ```
@@ -254,12 +310,14 @@ The "must fail" step validates your test is actually testing something.
 ### Mistake 2: Testing Implementation Instead of Behavior
 
 **Wrong:**
+
 ```go
 // Testing internal structure
 assert.Equal(t, 10, store.cache.capacity)
 ```
 
 **Right:**
+
 ```go
 // Testing behavior
 for i := 0; i < 15; i++ {
@@ -271,11 +329,13 @@ assert.Equal(t, 10, store.Size()) // Oldest evicted
 ### Mistake 3: Skipping CI-CHECK
 
 **Wrong:**
+
 ```
 Tests pass locally -> Done!
 ```
 
 **Right:**
+
 ```
 Tests pass locally -> make ci-check passes -> Done!
 ```

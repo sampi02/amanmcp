@@ -1,11 +1,13 @@
 # Dogfooding Methodology for RAG Systems: Lessons from Search Quality Validation
 
 > **Learning Objectives:**
+>
 > - Understand how to design dogfood tests for RAG/search systems
 > - Learn the "5 Whys" technique for root cause analysis
 > - Recognize vocabulary mismatch as a common RAG failure mode
 >
 > **Prerequisites:**
+>
 > - [Hybrid Search](../concepts/hybrid-search.md)
 > - Basic understanding of semantic search
 >
@@ -46,6 +48,38 @@ Dogfood tests answer: "Does it work for users?"
 ---
 
 ## Our Dogfooding Framework
+
+### Dogfooding Workflow
+
+```mermaid
+flowchart TD
+    Start["Build Validation Suite<br/>Real user queries"]
+    Tier["Categorize by Tier<br/>1: Must-pass<br/>2: Should-pass<br/>3: Nice-to-have"]
+    Run["Run Validation"]
+    Results{Pass Rate?}
+    Analyze["Failure Analysis<br/>Group by category"]
+    Success["✅ Release Ready"]
+    Whys["5 Whys Analysis<br/>Root cause"]
+    Pattern["Build Pattern Database<br/>What works vs fails"]
+    Fix["Implement Fixes"]
+
+    Start --> Tier --> Run --> Results
+    Results -->|"< 100% Tier 1"| Analyze
+    Results -->|"100% Tier 1"| Success
+    Analyze --> Whys --> Pattern --> Fix --> Run
+
+    classDef startNode fill:#3498db,stroke:#2980b9,stroke-width:2px,color:#fff
+    classDef processNode fill:#9b59b6,stroke:#8e44ad,stroke-width:2px,color:#fff
+    classDef analyzeNode fill:#e67e22,stroke:#d35400,stroke-width:2px,color:#fff
+    classDef actionNode fill:#16a085,stroke:#138d75,stroke-width:2px,color:#fff
+    classDef successNode fill:#27ae60,stroke:#229954,stroke-width:2px,color:#fff
+
+    class Start startNode
+    class Tier,Run processNode
+    class Analyze,Whys,Pattern analyzeNode
+    class Fix actionNode
+    class Success successNode
+```
 
 ### Tiered Query System
 
@@ -163,6 +197,53 @@ THE PATTERN: Queries matching actual code text succeed.
              Abstract queries fail.
 ```
 
+#### Vocabulary Mismatch Impact
+
+```mermaid
+flowchart TB
+    subgraph working["✅ Concrete Queries - Work"]
+        direction TB
+        W1["'RetryConfig MaxRetries'"]
+        W2["'Engine Search BM25Index'"]
+        W3["'hybrid combining BM25'"]
+    end
+
+    subgraph failing["❌ Abstract Queries - Fail"]
+        direction TB
+        F1["'Search function'"]
+        F2["'Index function'"]
+        F3["'OllamaEmbedder'"]
+    end
+
+    subgraph reasons["Why They Work/Fail"]
+        direction TB
+        R1["Concrete: Match code identifiers,<br/>exact terms, doc comments"]
+        R2["Abstract: User vocabulary,<br/>generic terms, partial matches"]
+    end
+
+    Root["Root Cause:<br/>Embedding model trained on general text<br/>Doesn't bridge concept → identifier gap"]
+
+    W1 & W2 & W3 --> R1
+    F1 & F2 & F3 --> R2
+    R1 --> Success["✅ Found in top 5"]
+    R2 --> Root
+    Root --> Fail["❌ No results"]
+
+    classDef workingClass fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724
+    classDef failingClass fill:#f8d7da,stroke:#dc3545,stroke-width:2px,color:#721c24
+    classDef reasonClass fill:#fff3cd,stroke:#ffc107,stroke-width:2px,color:#856404
+    classDef rootClass fill:#f5c6cb,stroke:#e67e22,stroke-width:2px,color:#721c24
+    classDef successClass fill:#28a745,stroke:#1e7e34,stroke-width:3px,color:#fff
+    classDef failClass fill:#dc3545,stroke:#bd2130,stroke-width:3px,color:#fff
+
+    class W1,W2,W3 workingClass
+    class F1,F2,F3 failingClass
+    class R1,R2 reasonClass
+    class Root rootClass
+    class Success successClass
+    class Fail failClass
+```
+
 ### Issue 2: Split Symbol Problem
 
 Large functions exceed chunk size limits and get split:
@@ -221,6 +302,7 @@ This issue was initially tracked as a separate bug (BUG-049) but investigation r
 **Your Context:** Build validation suites from actual user queries. Track what users search for in production. Add failing queries to your test suite.
 
 **Pattern:**
+
 ```python
 # Instead of synthetic tests
 def test_bm25_ranking():
@@ -493,6 +575,66 @@ Based on our analysis, these failure modes appear frequently:
 | Embedding dilution | Expanded queries worse | Over-expansion hurts vectors | Asymmetric expansion |
 | Comment weight | Concept terms only in comments | Comments weighted too low | Adjust chunk weighting |
 
+### RAG Failure Mode Breakdown
+
+```mermaid
+%%{init: {'theme':'default'}}%%
+pie title RAG Failure Modes Distribution (60% Tier 1 Failures)
+    "Vocabulary Mismatch" : 40
+    "Split Symbol Problem" : 25
+    "Scope Filter Bugs" : 20
+    "Embedding Dilution" : 10
+    "Comment Weight Issues" : 5
+```
+
+### Failure Mode Investigation Flow
+
+```mermaid
+flowchart TD
+    Start["Query Returns<br/>No Results"]
+    Type{What type<br/>of query?}
+    Vocab["Vocabulary<br/>Mismatch"]
+    Split["Split Symbol<br/>Problem"]
+    Scope["Scope Filter<br/>Bug"]
+    VocabFix["✅ Query expansion<br/>Chunk enrichment"]
+    SplitFix["✅ Parent symbol<br/>registration"]
+    ScopeFix["✅ Filter unit tests<br/>Normalization fix"]
+    Test["Re-run<br/>validation"]
+    Success{Pass?}
+    Done["✅ Issue resolved<br/>Add to regression suite"]
+    Whys["Run 5 Whys<br/>analysis"]
+    RootCause["Identify deeper<br/>root cause"]
+
+    Start --> Type
+    Type -->|"Abstract terms<br/>(function, search)"| Vocab
+    Type -->|"Large function<br/>name"| Split
+    Type -->|"With scope<br/>filter"| Scope
+
+    Vocab --> VocabFix
+    Split --> SplitFix
+    Scope --> ScopeFix
+
+    VocabFix --> Test
+    SplitFix --> Test
+    ScopeFix --> Test
+
+    Test --> Success
+    Success -->|YES| Done
+    Success -->|NO| Whys
+    Whys --> RootCause
+    RootCause --> Start
+
+    classDef problemNode fill:#f8d7da,stroke:#dc3545,stroke-width:2px,color:#721c24
+    classDef diagnosisNode fill:#fff3cd,stroke:#ffc107,stroke-width:2px,color:#856404
+    classDef solutionNode fill:#cfe2ff,stroke:#0d6efd,stroke-width:2px,color:#084298
+    classDef successNode fill:#d1e7dd,stroke:#28a745,stroke-width:2px,color:#0f5132
+
+    class Start problemNode
+    class Vocab,Split,Scope diagnosisNode
+    class VocabFix,SplitFix,ScopeFix,Test,Whys,RootCause solutionNode
+    class Done successNode
+```
+
 ---
 
 ## Metrics to Track
@@ -541,8 +683,3 @@ Based on our analysis, these failure modes appear frequently:
 - [Query Expansion Asymmetry](./query-expansion-asymmetric.md) - Why expansion helps BM25 but hurts vectors
 - [Vocabulary Mismatch Analysis](./vocabulary-mismatch-analysis.md) - Deep dive on the user/code vocabulary gap
 - [Hybrid Search Concepts](../concepts/hybrid-search.md) - How BM25 and vector search complement each other
-
----
-
-**Original Source:** `.aman-pm/postmortems/RCA-013` (internal)
-**Last Updated:** 2026-01-16

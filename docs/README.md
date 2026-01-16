@@ -50,6 +50,50 @@ Local RAG for your codebase. Zero config. Privacy-first.
 
 ## Documentation Structure
 
+```mermaid
+graph TB
+    START[AmanMCP Docs] --> ROLE{What's your role?}
+
+    ROLE -->|User| USER[👤 User Path]
+    ROLE -->|Developer| DEV[👩‍💻 Developer Path]
+    ROLE -->|Researcher| RES[🔬 Researcher Path]
+
+    USER --> U1[Getting Started]
+    USER --> U2[Guides]
+    USER --> U3[Reference]
+
+    DEV --> D1[Contributing]
+    DEV --> D2[Architecture]
+    DEV --> D3[Research]
+
+    RES --> R1[Research]
+    RES --> R2[Articles]
+    RES --> R3[Architecture]
+
+    U1 --> U1A[Installation<br/>First Steps]
+    U2 --> U2A[MLX Setup<br/>Configuration]
+    U3 --> U3A[CLI Commands<br/>Config Reference]
+
+    D1 --> D1A[Code Conventions<br/>Testing Guide]
+    D2 --> D2A[System Design<br/>Components]
+    D3 --> D3A[Technical Decisions<br/>Comparisons]
+
+    R1 --> R1A[Model Selection<br/>Infrastructure]
+    R2 --> R2A[Deep Dives<br/>Case Studies]
+    R3 --> R3A[Design Principles<br/>ADRs]
+
+    style START fill:#e1f5ff
+    style USER fill:#c8e6c9
+    style DEV fill:#c8e6c9
+    style RES fill:#c8e6c9
+    style U1 fill:#e1f5ff
+    style U2 fill:#e1f5ff
+    style D1 fill:#ffe0b2
+    style D2 fill:#ffe0b2
+    style R1 fill:#e1f5ff
+    style R2 fill:#e1f5ff
+```
+
 | Section | Purpose | Example |
 |---------|---------|---------|
 | [Getting Started](getting-started/) | Installation and first steps | "How do I install AmanMCP?" |

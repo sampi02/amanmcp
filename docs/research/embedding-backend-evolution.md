@@ -1,11 +1,13 @@
 # Embedding Backend Evolution: Why We Reversed Course on MLX
 
 > **Learning Objectives:**
+>
 > - Understand that speed is not everything - RAM matters for development workflows
 > - Learn how to evaluate trade-offs for developer experience
 > - See that reversing decisions when new data emerges is healthy engineering
 >
 > **Prerequisites:**
+>
 > - [Embedding Optimization](./embedding-optimization.md) - MLX benchmarks and why it was 55x faster
 > - [MLX Migration Case Study](./mlx-migration-case-study.md) - Original migration story
 >
@@ -23,17 +25,18 @@ MLX was 55x faster than Ollama for batch embedding, but it used too much RAM dur
 
 ## The Decision Chain
 
-```
-Phase 1: Ollama (default)
-  │ Problem: Too slow for large repos (48 min for 6,500 chunks)
-  ↓
-Phase 2: MLX (default on Apple Silicon) - ADR-035
-  │ Solution: 55x faster, 48 min → 3 min
-  │ Problem: Excessive RAM during long sessions
-  ↓
-Phase 3: Ollama (default), MLX opt-in - ADR-037
-  │ Solution: Best balance for daily use
-  └── Current state
+```mermaid
+timeline
+    title Embedding Backend Decision Evolution
+    Phase 1 (ADR-035) : Ollama Default
+                      : Problem: 48 min for 6,500 chunks
+                      : Decision: Too slow for large repos
+    Phase 2 (ADR-035) : MLX Default on Apple Silicon
+                      : Solution: 55x faster (48min → 3min)
+                      : Problem: Excessive RAM during sessions
+    Phase 3 (ADR-037) : Ollama Default, MLX Opt-in
+                      : Solution: Best balance for daily use
+                      : Status: Current implementation
 ```
 
 This evolution shows healthy engineering: we made a decision based on available data (ADR-035), gathered more data through real-world usage, and reversed when evidence demanded it (ADR-037).
@@ -51,6 +54,7 @@ The initial benchmarks were compelling:
 | TEI | Crashes | N/A | Not viable |
 
 For indexing 6,500 chunks:
+
 - **Ollama:** ~48 minutes
 - **MLX:** ~3 minutes
 
@@ -76,20 +80,28 @@ The benchmarks measured **indexing speed**, but development sessions involve mor
 
 ### The Reality of a Development Session
 
+```mermaid
+---
+config:
+  themeVariables:
+    xyChart:
+      backgroundColor: transparent
+---
+xychart-beta
+    title "RAM Usage Comparison: Development Environment"
+    x-axis ["Claude Code", "Ollama", "IDE", "Browser", "Docker", "Available", "MLX Added"]
+    y-axis "RAM Usage (GB)" 0 --> 35
+    bar [6, 5, 3, 3, 3, 5, 5]
+    line [6, 11, 14, 17, 20, 25, 30]
 ```
-Typical developer environment (24GB RAM):
-  ├── Claude Code (AI assistant)     → 4-8GB
-  ├── Ollama (LLM for chat)          → 4-6GB
-  ├── IDE + language servers         → 2-4GB
-  ├── Browser (docs, PRs)            → 2-4GB
-  ├── Docker containers              → 2-4GB
-  └── Available                      → 2-8GB
 
-Adding MLX embedding server:
-  └── MLX (Qwen3-8B-4bit model)      → +5GB
-      ↓
-  System becomes sluggish
-```
+**Legend:**
+
+- Bar chart: Individual component RAM usage
+- Line chart: Cumulative RAM usage
+- Red zone (>24GB): System becomes sluggish
+
+Adding MLX embedding server pushes a 24GB system into the red zone during sustained development sessions.
 
 ### The Discovery
 
@@ -117,12 +129,24 @@ The key insight came from analyzing when each operation happens:
 
 ### The Frequency Problem
 
-```
-Initial indexing: 1 time
-  └── MLX saves: 45 minutes (once)
+```mermaid
+gantt
+    title Usage Pattern Analysis: When Speed vs RAM Matters
+    dateFormat X
+    axisFormat %s
 
-Development session: ~8 hours/day
-  └── MLX costs: system sluggishness (ongoing)
+    section Initial Indexing (Once)
+    MLX saves 45 min :crit, 0, 1
+
+    section Daily Development (8 hrs)
+    Hour 1 RAM cost :active, 1, 2
+    Hour 2 RAM cost :active, 2, 3
+    Hour 3 RAM cost :active, 3, 4
+    Hour 4 RAM cost :active, 4, 5
+    Hour 5 RAM cost :active, 5, 6
+    Hour 6 RAM cost :active, 6, 7
+    Hour 7 RAM cost :active, 7, 8
+    Hour 8 RAM cost :active, 8, 9
 ```
 
 **The math didn't work.** Saving 45 minutes once doesn't justify hours of degraded development experience every day.
@@ -192,9 +216,11 @@ Fast benchmarks are seductive but incomplete. Consider the full picture:
 ### 2. Benchmark Real Workflows, Not Just Operations
 
 Our initial benchmarks measured:
+
 - Batch embedding throughput (indexing speed)
 
 What we should have also measured:
+
 - Memory usage during sustained operation
 - System responsiveness with other applications
 - Development session impact
@@ -308,10 +334,3 @@ AMANMCP_EMBEDDER=ollama amanmcp search "query"
 - [Embedding Optimization](./embedding-optimization.md) - MLX benchmarks and why it's 55x faster
 - [MLX Migration Case Study](./mlx-migration-case-study.md) - Original migration story
 - [Embedding Model Evolution](./embedding-model-evolution.md) - Full history of embedding choices
-
----
-
-**Original Source:** `.aman-pm/decisions/ADR-037-ollama-default-embedder.md` (internal)
-**Related ADRs:** ADR-035 (superseded), ADR-037 (current)
-**Status:** Current implementation
-**Last Updated:** 2026-01-16

@@ -455,14 +455,14 @@ flowchart TD
 
     Start --> Q1{"Do you know the<br/>exact text/pattern?"}
 
-    Q1 -->|"Yes"| Grep["Use Grep/Glob"]
-    Q1 -->|"No"| Q2{"Are you trying to<br/>understand a concept?"}
+    Q1 -->|Yes| Grep["Use Grep/Glob"]
+    Q1 -->|No| Q2{"Are you trying to<br/>understand a concept?"}
 
-    Q2 -->|"Yes"| MCP["Use amanmcp MCP"]
-    Q2 -->|"No"| Q3{"Looking for<br/>file by name?"}
+    Q2 -->|Yes| MCP["Use amanmcp MCP"]
+    Q2 -->|No| Q3{"Looking for<br/>file by name?"}
 
-    Q3 -->|"Yes"| Glob["Use Glob"]
-    Q3 -->|"No"| MCP
+    Q3 -->|Yes| Glob["Use Glob"]
+    Q3 -->|No| MCP
 
     Grep --> GrepEx["Examples:<br/>• func NewClient\(<br/>• TODO:<br/>• import \"package\""]
 
@@ -701,9 +701,9 @@ graph TD
     Task["Search Task"]
     Task --> Decision{"What type?"}
 
-    Decision -->|"Understand concept"| MCP
-    Decision -->|"Find exact text"| Grep
-    Decision -->|"Find files"| Glob
+    Decision -->|Understand concept| MCP
+    Decision -->|Find exact text| Grep
+    Decision -->|Find files| Glob
 
     MCP --> Result["Comprehensive<br/>Codebase Navigation"]
     Grep --> Result

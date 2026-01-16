@@ -48,6 +48,47 @@ Organizations that adapt their project management practices for AI-assisted deve
 
 The opportunity is not to fight against AI's speed but to redesign workflows around it.
 
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#e1f5ff', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#3498db', 'lineColor': '#3498db', 'secondaryColor': '#c8e6c9', 'tertiaryColor': '#ffe0b2'}}}%%
+graph LR
+    subgraph Traditional["Traditional PM (Pre-AI)"]
+        T1[Human writes spec<br/>4-8 hours]
+        T2[Human breaks down<br/>2-4 hours]
+        T3[Human implements<br/>20-40 hours]
+        T4[Human writes docs<br/>4-8 hours]
+
+        T1 --> T2 --> T3 --> T4
+
+        Total1[Total: 30-60 hours<br/>100% human time]
+    end
+
+    subgraph AI["AI-Native PM"]
+        A1[AI writes spec<br/>5 minutes]
+        A2[Human reviews<br/>15 minutes]
+        A3[AI breaks down<br/>2 minutes]
+        A4[Human approves<br/>10 minutes]
+        A5[AI implements<br/>2-6 hours]
+        A6[Human validates<br/>30 minutes]
+        A7[AI writes docs<br/>2 minutes]
+
+        A1 --> A2 --> A3 --> A4 --> A5 --> A6 --> A7
+
+        Total2[Total: 3-7 hours<br/>1 hour human time<br/>70-90% time savings]
+    end
+
+    style Traditional fill:#ffe0b2,stroke:#f39c12,stroke-width:2px
+    style AI fill:#c8e6c9,stroke:#27ae60,stroke-width:2px
+    style Total1 fill:#ffccbc,stroke:#e74c3c,stroke-width:2px
+    style Total2 fill:#c8e6c9,stroke:#27ae60,stroke-width:3px
+    style T1 fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+    style T2 fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+    style T3 fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+    style T4 fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+    style A2 fill:#e1f5ff,stroke:#3498db,stroke-width:2px
+    style A4 fill:#e1f5ff,stroke:#3498db,stroke-width:2px
+    style A6 fill:#e1f5ff,stroke:#3498db,stroke-width:2px
+```
+
 ---
 
 ## The AI-Native Agile Framework
@@ -71,19 +112,51 @@ The fundamental shift: humans move from creators to directors. Instead of writin
 
 Traditional Agile has epics, stories, tasks. AI-native development extends this with a clear creation-and-approval model:
 
-```
-Epic (Human-defined strategic initiative)
-  |
-  +-- Feature (Human-approved, AI-elaborated scope)
-        |
-        +-- Spec (AI-generated, Human-validated requirements)
-              |
-              +-- Task (AI-planned work unit)
-                    |
-                    +-- Subtask (AI-executed atomic action)
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#e1f5ff', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#3498db', 'lineColor': '#3498db', 'secondaryColor': '#c8e6c9', 'tertiaryColor': '#fff4e6'}}}%%
+flowchart TD
+    Epic["Epic<br/>(Human-defined strategic initiative)"]
+    Feature["Feature<br/>(Human-approved, AI-elaborated scope)"]
+    Spec["Spec<br/>(AI-generated, Human-validated requirements)"]
+    Task["Task<br/>(AI-planned work unit)"]
+    Subtask["Subtask<br/>(AI-executed atomic action)"]
+
+    Epic --> Feature
+    Feature --> Spec
+    Spec --> Task
+    Task --> Subtask
+
+    style Epic fill:#3498db,stroke:#2c3e50,stroke-width:3px,color:#fff
+    style Feature fill:#27ae60,stroke:#2c3e50,stroke-width:2px,color:#fff
+    style Spec fill:#f39c12,stroke:#2c3e50,stroke-width:2px
+    style Task fill:#9b59b6,stroke:#2c3e50,stroke-width:2px,color:#fff
+    style Subtask fill:#e74c3c,stroke:#2c3e50,stroke-width:2px,color:#fff
 ```
 
 **Key difference from traditional Agile:** AI agents generate the breakdown. Humans validate and approve rather than create from scratch. This is faster and often produces more comprehensive breakdowns because AI can analyze the entire codebase for dependencies.
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#e1f5ff', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#3498db', 'lineColor': '#3498db', 'secondaryColor': '#c8e6c9', 'tertiaryColor': '#fff4e6'}}}%%
+graph TD
+    A[Backlog Items] -->|Grouped into| B[Sprint]
+    B -->|Divided into| C[Sessions]
+    C -->|Contains| D[Tasks]
+    D -->|Broken into| E[Subtasks]
+
+    classDef backlog fill:#3498db,stroke:#2c3e50,stroke-width:2px,color:#fff
+    classDef sprint fill:#27ae60,stroke:#2c3e50,stroke-width:2px,color:#fff
+    classDef session fill:#f39c12,stroke:#2c3e50,stroke-width:2px
+    classDef task fill:#9b59b6,stroke:#2c3e50,stroke-width:2px,color:#fff
+    classDef subtask fill:#e74c3c,stroke:#2c3e50,stroke-width:2px,color:#fff
+
+    A:::backlog
+    B:::sprint
+    C:::session
+    D:::task
+    E:::subtask
+```
+
+**Visual explanation:** Work flows from the backlog through sprints, which are divided into focused sessions. Each session contains tasks that break down into atomic subtasks for execution.
 
 ### Human Approval Gates
 
@@ -107,6 +180,48 @@ Total human time: 25 minutes for work that would have taken hours of planning pl
 ## Sprint Lifecycle Adaptations
 
 Each phase of the traditional sprint lifecycle needs adaptation for AI participation.
+
+```mermaid
+graph LR
+    subgraph Traditional["Traditional Sprint (2 weeks)"]
+        T1[Planning Meeting<br/>2-4 hours] --> T2[Daily Standups<br/>15 min/day]
+        T2 --> T3[Development Work]
+        T3 --> T4[Review Meeting<br/>1-2 hours]
+        T4 --> T5[Retrospective<br/>1 hour]
+    end
+
+    subgraph AI["AI-Native Sprint (Fluid)"]
+        A1[AI Proposes Scope<br/>2 min] --> A2[Human Approves<br/>5-15 min]
+        A2 --> A3[Continuous Work<br/>AI + Human]
+        A3 --> A4[AI Generates Report<br/>1 min]
+        A4 --> A5[Human Validates<br/>10-20 min]
+        A5 --> A6[AI Analyzes Patterns<br/>2 min]
+        A6 --> A7[Human Reviews<br/>5-10 min]
+    end
+
+    Traditional:::traditional
+    AI:::ainative
+
+    T1:::traditional
+    T2:::traditional
+    T3:::traditional
+    T4:::traditional
+    T5:::traditional
+
+    A1:::ainative
+    A2:::human
+    A3:::ainative
+    A4:::ainative
+    A5:::human
+    A6:::ainative
+    A7:::human
+
+    classDef traditional fill:#f39c12,stroke:#2c3e50,stroke-width:2px
+    classDef ainative fill:#27ae60,stroke:#2c3e50,stroke-width:2px
+    classDef human fill:#3498db,stroke:#2c3e50,stroke-width:2px
+```
+
+**Comparison:** Traditional sprints require 8-10 hours of meeting time. AI-native sprints reduce human time to 20-45 minutes through AI-generated proposals and reports.
 
 ### Phase 1: Backlog Grooming (Continuous)
 
@@ -180,6 +295,53 @@ Each phase of the traditional sprint lifecycle needs adaptation for AI participa
 
 AI-assisted development works best with clear session boundaries. Each session is a bounded work period where an AI agent operates with full context.
 
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#e1f5ff', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#3498db', 'lineColor': '#3498db', 'secondaryColor': '#c8e6c9', 'tertiaryColor': '#fff4e6'}}}%%
+flowchart TD
+    Start(["/aman start"]) --> Pull[Pull latest changes]
+    Pull --> Review[Review sprint status]
+    Review --> Load[Load project context]
+    Load --> Pick[Pick work items]
+    Pick --> Mark[Mark items in-progress]
+
+    Mark --> Work[Work on tasks]
+    Work --> Update[Update specs as needed]
+    Update --> Capture[Capture learnings]
+    Capture --> Create[Create issues for discoveries]
+
+    Create --> Sync[Sync documentation]
+    Sync --> Summary[Generate session summary]
+    Summary --> Commit[Commit all artifacts]
+    Commit --> Complete[Mark items complete/carry over]
+    Complete --> Archive[Archive obsolete items]
+    Archive --> End(["/aman end"])
+
+    classDef startNode fill:#27ae60,stroke:#2c3e50,stroke-width:3px,color:#fff
+    classDef endNode fill:#27ae60,stroke:#2c3e50,stroke-width:3px,color:#fff
+    classDef setup fill:#3498db,stroke:#2c3e50,stroke-width:2px
+    classDef active fill:#f39c12,stroke:#2c3e50,stroke-width:2px
+    classDef cleanup fill:#9b59b6,stroke:#2c3e50,stroke-width:2px
+
+    Start:::startNode
+    End:::endNode
+    Pull:::setup
+    Review:::setup
+    Load:::setup
+    Pick:::setup
+    Mark:::setup
+    Work:::active
+    Update:::active
+    Capture:::active
+    Create:::active
+    Sync:::cleanup
+    Summary:::cleanup
+    Commit:::cleanup
+    Complete:::cleanup
+    Archive:::cleanup
+```
+
+**Session lifecycle:** Every session follows a three-phase pattern: setup (blue), active work (orange), and cleanup (purple). This structure ensures context is loaded at start and preserved at end.
+
 ### Session Start Ritual
 
 Every session should begin with these steps:
@@ -213,7 +375,111 @@ Every session should end with these steps:
 4. **Mark items complete or carry over** - Update status with notes
 5. **Archive obsolete items** - Clean up what is no longer relevant
 
+```mermaid
+graph TD
+    Summary[Session Summary] --> What[What was accomplished]
+    Summary --> Blocked[What is blocked]
+    Summary --> Next[What comes next]
+
+    What --> Code[Code Changes]
+    What --> Tests[Tests Added]
+    What --> Docs[Documentation]
+
+    Blocked --> Technical[Technical Blockers]
+    Blocked --> Decision[Decision Needed]
+    Blocked --> External[External Dependencies]
+
+    Next --> Continuation[Continuation Tasks]
+    Next --> NewIssues[New Issues Found]
+    Next --> Recommendations[AI Recommendations]
+
+    Code --> Handoff[Handoff Document]
+    Tests --> Handoff
+    Docs --> Handoff
+    Technical --> Handoff
+    Decision --> Handoff
+    External --> Handoff
+    Continuation --> Handoff
+    NewIssues --> Handoff
+    Recommendations --> Handoff
+
+    Summary:::root
+    What:::accomplished
+    Blocked:::blockers
+    Next:::next
+    Code:::detail
+    Tests:::detail
+    Docs:::detail
+    Technical:::detail
+    Decision:::detail
+    External:::detail
+    Continuation:::detail
+    NewIssues:::detail
+    Recommendations:::detail
+    Handoff:::output
+
+    classDef root fill:#27ae60,stroke:#2c3e50,stroke-width:3px
+    classDef accomplished fill:#3498db,stroke:#2c3e50,stroke-width:2px
+    classDef blockers fill:#e74c3c,stroke:#2c3e50,stroke-width:2px
+    classDef next fill:#f39c12,stroke:#2c3e50,stroke-width:2px
+    classDef detail fill:#ecf0f1,stroke:#2c3e50,stroke-width:2px
+    classDef output fill:#9b59b6,stroke:#2c3e50,stroke-width:2px
+```
+
+**Handoff structure:** Session summaries combine what was accomplished (blue), blockers (red), and next steps (orange) into a comprehensive handoff document for continuity.
+
 **Why this matters:** Without explicit session end, context is lost. The next session (yours or another agent's) starts from scratch. The "why" behind decisions evaporates.
+
+```mermaid
+flowchart LR
+    subgraph Session1["Session 1"]
+        S1W[Work] --> S1D[Decisions]
+        S1D --> S1L[Learnings]
+    end
+
+    subgraph Memory["Memory System"]
+        S1L --> LF[learnings.md]
+        S1D --> IX[index.yaml]
+        S1W --> CH[changelog/]
+
+        LF --> CTX[Context Files]
+        IX --> CTX
+        CH --> CTX
+    end
+
+    subgraph Session2["Session 2"]
+        CTX --> S2S["/aman start"]
+        S2S --> S2C[Load Context]
+        S2C --> S2W[Work]
+    end
+
+    Session1:::past
+    Memory:::system
+    Session2:::current
+
+    S1W:::work
+    S1D:::decision
+    S1L:::learning
+    LF:::file
+    IX:::file
+    CH:::file
+    CTX:::file
+    S2S:::sessionStart
+    S2C:::load
+    S2W:::work
+
+    classDef past fill:#9b59b6,stroke:#2c3e50,stroke-width:2px
+    classDef system fill:#27ae60,stroke:#2c3e50,stroke-width:2px
+    classDef current fill:#3498db,stroke:#2c3e50,stroke-width:2px
+    classDef work fill:#f39c12,stroke:#2c3e50,stroke-width:2px
+    classDef decision fill:#e74c3c,stroke:#2c3e50,stroke-width:2px
+    classDef learning fill:#1abc9c,stroke:#2c3e50,stroke-width:2px
+    classDef file fill:#ecf0f1,stroke:#2c3e50,stroke-width:2px
+    classDef sessionStart fill:#27ae60,stroke:#2c3e50,stroke-width:2px
+    classDef load fill:#3498db,stroke:#2c3e50,stroke-width:2px
+```
+
+**Memory flow:** Decisions and learnings from Session 1 flow into structured files (learnings.md, index.yaml, changelog). Session 2 loads this context via `/aman start`, ensuring continuity.
 
 ---
 
@@ -328,6 +594,48 @@ AI Proposes --> Human Reviews --> AI Executes --> Human Validates
 
 **Why this matters:** AI agents make mistakes. They optimize for patterns they have seen, not for your specific business context. Human approval gates catch misalignments early.
 
+```mermaid
+flowchart TD
+    Start([Human: Define Goal]) --> Analyze[AI: Analyze Context]
+    Analyze --> Propose[AI: Propose Breakdown]
+    Propose --> Review{Human: Review}
+
+    Review -->|Approved| Execute[AI: Execute Tasks]
+    Review -->|Changes Needed| Revise[AI: Revise Proposal]
+    Revise --> Review
+
+    Execute --> Monitor[AI: Monitor Progress]
+    Monitor --> Report[AI: Generate Report]
+    Report --> Validate{Human: Validate Output}
+
+    Validate -->|Accepted| Complete[AI: Mark Complete]
+    Validate -->|Issues Found| Fix[AI: Fix Issues]
+    Fix --> Validate
+
+    Complete --> Learn[AI: Capture Learnings]
+    Learn --> End([Session End])
+
+    Start:::human
+    Review:::human
+    Validate:::human
+    End:::human
+
+    Analyze:::ai
+    Propose:::ai
+    Execute:::ai
+    Revise:::ai
+    Monitor:::ai
+    Report:::ai
+    Fix:::ai
+    Complete:::ai
+    Learn:::ai
+
+    classDef human fill:#3498db,stroke:#2c3e50,stroke-width:3px
+    classDef ai fill:#27ae60,stroke:#2c3e50,stroke-width:2px
+```
+
+**AI-native workflow:** Humans define goals and approve at decision points (blue). AI handles analysis, execution, and reporting (green). This division maximizes leverage for both.
+
 ### Pattern 4: Generate Documentation, Do Not Write It
 
 ```
@@ -375,29 +683,37 @@ Result: Duplicate work, merge conflicts, wasted effort
 
 Model Context Protocol (MCP) provides a standard interface for AI agents to interact with external tools and data.
 
-```
-+---------------------------------------------------------+
-|                 MULTI-AGENT ARCHITECTURE                |
-|                                                         |
-|   Human Director                                        |
-|        |                                                |
-|        | Defines goals, reviews, approves              |
-|        v                                                |
-|   +-------------------------------------------+         |
-|   |   PM Agent (Central State Manager)        |         |
-|   |   Maintains single source of truth        |         |
-|   +-------------------------------------------+         |
-|        |                                                |
-|        | MCP Protocol (standard interface)              |
-|        |                                                |
-|   +----+----+----------+----------+--------+            |
-|   v         v          v          v        v            |
-| Claude   Cursor     Gemini    Windsurf  Custom          |
-|  Code              CLI                   Agents         |
-|                                                         |
-|   All agents interact through same protocol             |
-|   All changes flow through PM layer                     |
-+---------------------------------------------------------+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#e1f5ff', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#3498db', 'lineColor': '#3498db', 'secondaryColor': '#c8e6c9', 'tertiaryColor': '#fff4e6'}}}%%
+flowchart TD
+    Human["Human Director<br/>Defines goals, reviews, approves"]
+
+    PM["PM Agent<br/>(Central State Manager)<br/>Maintains single source of truth"]
+
+    Claude["Claude Code"]
+    Cursor["Cursor"]
+    Gemini["Gemini CLI"]
+    Windsurf["Windsurf"]
+    Custom["Custom Agents"]
+
+    Human -->|Directs| PM
+
+    PM -->|MCP Protocol| Claude
+    PM -->|MCP Protocol| Cursor
+    PM -->|MCP Protocol| Gemini
+    PM -->|MCP Protocol| Windsurf
+    PM -->|MCP Protocol| Custom
+
+    Note1["All agents interact through same protocol<br/>All changes flow through PM layer"]
+
+    style Human fill:#3498db,stroke:#2c3e50,stroke-width:3px,color:#fff
+    style PM fill:#27ae60,stroke:#2c3e50,stroke-width:3px,color:#fff
+    style Claude fill:#e1f5ff,stroke:#3498db,stroke-width:2px
+    style Cursor fill:#e1f5ff,stroke:#3498db,stroke-width:2px
+    style Gemini fill:#e1f5ff,stroke:#3498db,stroke-width:2px
+    style Windsurf fill:#e1f5ff,stroke:#3498db,stroke-width:2px
+    style Custom fill:#e1f5ff,stroke:#3498db,stroke-width:2px
+    style Note1 fill:#fff4e6,stroke:#f39c12,stroke-width:1px
 ```
 
 **Key benefit:** Any agent that speaks MCP can participate in project management. No custom integrations per tool.

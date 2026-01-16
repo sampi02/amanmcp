@@ -58,6 +58,41 @@ Session 4: Create ROADMAP.md (another summary)
 Result: 4 documents for one concern
 ```
 
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#e1f5ff', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#3498db', 'lineColor': '#3498db', 'secondaryColor': '#ffe0b2', 'tertiaryColor': '#fff9c4'}}}%%
+graph LR
+    subgraph Session1["Session 1: Monday"]
+        S1[Create dogfood.md<br/>880 lines]
+    end
+
+    subgraph Session2["Session 2: Tuesday"]
+        S2[Create execution-state.json<br/>For automation]
+    end
+
+    subgraph Session3["Session 3: Wednesday"]
+        S3[Create EXECUTION.md<br/>Summary attempt]
+    end
+
+    subgraph Session4["Session 4: Thursday"]
+        S4[Create ROADMAP.md<br/>Another summary]
+    end
+
+    S1 -.->|No memory| S2
+    S2 -.->|No memory| S3
+    S3 -.->|No memory| S4
+
+    S1 --> Result[4 documents<br/>1 concern<br/>Sprawl!]
+    S2 --> Result
+    S3 --> Result
+    S4 --> Result
+
+    style S1 fill:#ffe0b2,stroke:#f39c12,stroke-width:2px
+    style S2 fill:#ffe0b2,stroke:#f39c12,stroke-width:2px
+    style S3 fill:#ffe0b2,stroke:#f39c12,stroke-width:2px
+    style S4 fill:#ffe0b2,stroke:#f39c12,stroke-width:2px
+    style Result fill:#ffccbc,stroke:#e74c3c,stroke-width:2px
+```
+
 ### Spec-Driven Development Overhead
 
 [Spec-driven development](https://martinfowler.com/articles/exploring-gen-ai/sdd-3-tools.html) creates a spec to plan to task pipeline. Without discipline, each feature can generate:
@@ -98,12 +133,29 @@ When both remain "active," developers don't know which to read or trust.
 
 Adopt a clear hierarchy matching [AI documentation trends](https://document360.com/blog/ai-documentation-trends/):
 
-```
-ROOT (Entry Points)
-├── EXECUTION.md    # What NOW (current task, <100 lines)
-├── ROADMAP.md      # What NEXT (all items, <200 lines)
-├── VALIDATION.md   # How to VERIFY (<200 lines)
-└── CLAUDE.md       # AI instructions (references above)
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#c8e6c9', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#27ae60', 'lineColor': '#27ae60', 'secondaryColor': '#e1f5ff', 'tertiaryColor': '#fff9c4'}}}%%
+graph TD
+    Root[Project Root] --> CLAUDE[CLAUDE.md<br/>AI Instructions<br/>References below]
+
+    Root --> EXE[EXECUTION.md<br/>What NOW<br/><100 lines<br/>Current task]
+    Root --> ROAD[ROADMAP.md<br/>What NEXT<br/><200 lines<br/>All items]
+    Root --> VAL[VALIDATION.md<br/>How to VERIFY<br/><200 lines<br/>Quality gates]
+
+    CLAUDE -.->|References| EXE
+    CLAUDE -.->|References| ROAD
+    CLAUDE -.->|References| VAL
+
+    EXE --> Archive[Archive/<br/>Historical details]
+    ROAD --> Archive
+    VAL --> Archive
+
+    style Root fill:#f0f0f0,stroke:#2c3e50,stroke-width:2px
+    style CLAUDE fill:#e1f5ff,stroke:#3498db,stroke-width:3px
+    style EXE fill:#c8e6c9,stroke:#27ae60,stroke-width:3px
+    style ROAD fill:#c8e6c9,stroke:#27ae60,stroke-width:3px
+    style VAL fill:#c8e6c9,stroke:#27ae60,stroke-width:3px
+    style Archive fill:#fff9c4,stroke:#f39c12,stroke-width:2px
 ```
 
 **Why this works:**
@@ -117,6 +169,32 @@ ROOT (Entry Points)
 4. **CLAUDE.md** provides AI-specific instructions without duplicating content.
 
 Everything else moves to archive/ or the project management system.
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#c8e6c9', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#27ae60', 'lineColor': '#27ae60', 'secondaryColor': '#e1f5ff', 'tertiaryColor': '#f0f0f0'}}}%%
+graph TD
+    Dev[Developer Arrives] --> Q1{What's my<br/>next task?}
+    Q1 -->|2 min read| EXE[EXECUTION.md<br/><100 lines<br/>Current sprint focus]
+
+    Dev --> Q2{What's the<br/>big picture?}
+    Q2 -->|5 min read| ROAD[ROADMAP.md<br/><200 lines<br/>Prioritized backlog]
+
+    Dev --> Q3{How do I verify<br/>quality?}
+    Q3 -->|5 min read| VAL[VALIDATION.md<br/><200 lines<br/>Test gates & metrics]
+
+    EXE --> Work[Start Coding]
+    ROAD --> Work
+    VAL --> Work
+
+    Work --> AI[AI Assistant Needs<br/>Instructions]
+    AI --> CLAUDE[CLAUDE.md<br/>References EXE, ROAD, VAL]
+
+    style EXE fill:#c8e6c9,stroke:#27ae60,stroke-width:2px
+    style ROAD fill:#c8e6c9,stroke:#27ae60,stroke-width:2px
+    style VAL fill:#c8e6c9,stroke:#27ae60,stroke-width:2px
+    style CLAUDE fill:#e1f5ff,stroke:#3498db,stroke-width:2px
+    style Work fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+```
 
 ## Best Practices for AI-Native Documentation
 
@@ -194,6 +272,71 @@ After implementing the three-document system:
 
 The key insight: **entry points matter more than comprehensiveness**. A new developer needs 3 clear documents, not 150 comprehensive ones.
 
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffccbc', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#e74c3c', 'lineColor': '#e67e22', 'secondaryColor': '#c8e6c9', 'tertiaryColor': '#f0f0f0'}}}%%
+graph TB
+    subgraph Before["Before: Monolithic Documentation Sprawl"]
+        B1[README.md]
+        B2[dogfood.md<br/>880 lines]
+        B3[EXECUTION.md]
+        B4[ROADMAP.md]
+        B5[WORK.md]
+        B6[execution-state.json]
+        B7[strategic-improvements.md]
+        B8[VALIDATION.md]
+        B9[baseline-results.json]
+        B10[CLAUDE.md<br/>400+ lines]
+        B11[+ 140 more docs]
+
+        B1 -.->|Unclear hierarchy| B2
+        B2 -.->|Duplicates| B3
+        B3 -.->|Duplicates| B4
+        B4 -.->|Duplicates| B5
+        B7 -.->|Duplicates| B4
+        B8 -.->|Duplicates| B2
+        B9 -.->|Duplicates| B8
+        B10 -.->|References| B1
+        B10 -.->|References| B2
+        B10 -.->|References| B3
+        B10 -.->|References| B4
+    end
+
+    subgraph After["After: Three-Document System + Archive"]
+        A1[CLAUDE.md<br/><300 lines]
+        A2[EXECUTION.md<br/><100 lines]
+        A3[ROADMAP.md<br/><200 lines]
+        A4[VALIDATION.md<br/><200 lines]
+        A5[archive/<br/>Historical details]
+
+        A1 -.->|References| A2
+        A1 -.->|References| A3
+        A1 -.->|References| A4
+        A2 -.->|Points to| A5
+        A3 -.->|Points to| A5
+        A4 -.->|Points to| A5
+    end
+
+    Before -.->|Consolidation| After
+
+    style B1 fill:#ffccbc,stroke:#e74c3c,stroke-width:2px
+    style B2 fill:#ffccbc,stroke:#e74c3c,stroke-width:2px
+    style B3 fill:#ffccbc,stroke:#e74c3c,stroke-width:2px
+    style B4 fill:#ffccbc,stroke:#e74c3c,stroke-width:2px
+    style B5 fill:#ffccbc,stroke:#e74c3c,stroke-width:2px
+    style B6 fill:#ffccbc,stroke:#e74c3c,stroke-width:2px
+    style B7 fill:#ffccbc,stroke:#e74c3c,stroke-width:2px
+    style B8 fill:#ffccbc,stroke:#e74c3c,stroke-width:2px
+    style B9 fill:#ffccbc,stroke:#e74c3c,stroke-width:2px
+    style B10 fill:#ffccbc,stroke:#e74c3c,stroke-width:2px
+    style B11 fill:#ffccbc,stroke:#e74c3c,stroke-width:2px
+
+    style A1 fill:#c8e6c9,stroke:#27ae60,stroke-width:2px
+    style A2 fill:#c8e6c9,stroke:#27ae60,stroke-width:2px
+    style A3 fill:#c8e6c9,stroke:#27ae60,stroke-width:2px
+    style A4 fill:#c8e6c9,stroke:#27ae60,stroke-width:2px
+    style A5 fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+```
+
 ## Lessons for Any AI-Native Project
 
 ### 1. Documentation debt compounds faster than code debt
@@ -208,9 +351,28 @@ Each session solves immediate problems without global optimization. Schedule exp
 
 Documents are either actively maintained or archived. The middle ground of "occasionally referenced" guarantees staleness. Make the binary choice.
 
-## Quarterly Audit Checklist
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#e1f5ff', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#3498db', 'lineColor': '#3498db', 'secondaryColor': '#fff4e6', 'tertiaryColor': '#c8e6c9'}}}%%
+timeline
+    title Evolution from Traditional to AI-Native Documentation
+    section Traditional Development (Pre-2023)
+        Monolithic README : Single 1000+ line file with everything in one place - Hard to navigate
+        Hierarchical docs/ : Manual folder structure with table of contents - Humans maintain
+    section Early AI-Assisted (2023)
+        AI generates docs : Speed increases 10x but documentation explosion - No consolidation strategy
+        Multiple READMEs : Feature-specific docs lead to duplication - Context loss
+    section AI-Native Patterns Emerge (2024-2025)
+        CLAUDE.md appears : AI-specific instructions but still monolithic - 400+ lines common
+        Session sprawl : Each session creates files with no memory - 150+ docs accumulate
+    section Modern AI-Native (2026+)
+        Three-Document System : EXECUTION/ROADMAP/VALIDATION with CLAUDE.md as pointer - Less than 300 lines total
+        Archive-First Culture : Active vs archived binary with pointers not copies - 60% reduction in active docs
+        Session discipline : Start/end rituals with context preservation - Less than 10 min onboarding
+```
 
-Use this checklist every quarter to prevent documentation sprawl:
+## Weekly Audit Checklist
+
+Use this checklist every week to prevent documentation sprawl:
 
 **Archive Review:**
 - [ ] Move all resolved bugs to archive
@@ -234,6 +396,55 @@ Use this checklist every quarter to prevent documentation sprawl:
 - [ ] Ensure new docs follow pointer-not-copy pattern
 - [ ] Check that summaries archived their sources
 
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#e1f5ff', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#3498db', 'lineColor': '#3498db', 'secondaryColor': '#c8e6c9', 'tertiaryColor': '#fff9c4'}}}%%
+flowchart TD
+    Start([Weekly Audit Day]) --> Archive[Archive Review]
+
+    Archive --> A1{Resolved bugs<br/>still active?}
+    A1 -->|Yes| A1Action[Move to archive/bugs/resolved/]
+    A1 -->|No| A2{Resolved tech<br/>debt active?}
+    A1Action --> A2
+
+    A2 -->|Yes| A2Action[Move to archive/debt/resolved/]
+    A2 -->|No| A3{Completed<br/>specs active?}
+    A2Action --> A3
+
+    A3 -->|Yes| A3Action[Move to archive/specs/]
+    A3 -->|No| Consolidate[Consolidation Phase]
+    A3Action --> Consolidate
+
+    Consolidate --> C1{Find duplicates<br/>same topic}
+    C1 -->|Found| C1Action[Merge/Delete<br/>Keep 1 SSOT]
+    C1 -->|None| Health[Health Check]
+    C1Action --> Health
+
+    Health --> H1{CLAUDE.md<br/>broken links?}
+    H1 -->|Yes| H1Fix[Fix references]
+    H1 -->|No| H2{Entry points<br/>>200 lines?}
+    H1Fix --> H2
+
+    H2 -->|Yes| H2Fix[Consolidate content]
+    H2 -->|No| H3{New dev<br/>understands<br/><10 min?}
+    H2Fix --> H3
+
+    H3 -->|No| H3Fix[Improve entry points]
+    H3 -->|Yes| Prevent[Prevention Check]
+    H3Fix --> Prevent
+
+    Prevent --> P1{New docs follow<br/>pointer pattern?}
+    P1 -->|No| P1Fix[Update to pointers]
+    P1 -->|Yes| Done([Audit Complete])
+    P1Fix --> Done
+
+    style Start fill:#e1f5ff,stroke:#3498db,stroke-width:2px
+    style Done fill:#c8e6c9,stroke:#27ae60,stroke-width:2px
+    style Archive fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+    style Consolidate fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+    style Health fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+    style Prevent fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+```
+
 ## See Also
 
 ### Research Sources
@@ -251,6 +462,6 @@ Use this checklist every quarter to prevent documentation sprawl:
 
 ---
 
-**Based on:** AmanMCP documentation cleanup, January 2026
-**Original Analysis:** `.aman-pm/postmortems/RCA-012` (internal)
+**Based on:** AmanMCP documentation cleanup, January 2026.  
+**Original Analysis:** `.aman-pm/postmortems/RCA-012` (internal)  
 **Last Updated:** 2026-01-16

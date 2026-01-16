@@ -21,6 +21,64 @@ Where:
 | 400-499 | VALIDATION | Input validation errors |
 | 500-599 | INTERNAL | Internal system errors |
 
+### Error Code Taxonomy
+
+```mermaid
+---
+config:
+  layout: elk
+  look: neo
+  theme: neo
+---
+graph TB
+    Root[AmanMCP Errors]
+    Root --> Config[100-199: CONFIG]
+    Root --> IO[200-299: IO]
+    Root --> Network[300-399: NETWORK]
+    Root --> Validation[400-499: VALIDATION]
+    Root --> Internal[500-599: INTERNAL]
+
+    Config --> C101[101: Not Found]
+    Config --> C102[102: Invalid]
+    Config --> C103[103: Permission]
+
+    IO --> I201[201: File Not Found]
+    IO --> I202[202: File Permission]
+    IO --> I203[203: Disk Full]
+    IO --> I204[204: File Too Large]
+    IO --> I205[205: Corrupt Index]
+    IO --> I206[206: File Corrupt]
+
+    Network --> N301[301: Timeout]
+    Network --> N302[302: Unavailable]
+    Network --> N303[303: Model Download]
+
+    Validation --> V401[401: Invalid Input]
+    Validation --> V402[402: Dimension Mismatch]
+    Validation --> V403[403: Invalid Query]
+    Validation --> V404[404: Query Empty]
+    Validation --> V405[405: Query Too Long]
+    Validation --> V406[406: Invalid Path]
+
+    Internal --> In501[501: Internal]
+    Internal --> In502[502: Embedding Failed]
+    Internal --> In503[503: Search Failed]
+    Internal --> In504[504: Chunking Failed]
+    Internal --> In505[505: Index Failed]
+
+    classDef configClass fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+    classDef ioClass fill:#fff4e1,stroke:#cc6600,stroke-width:2px
+    classDef networkClass fill:#ffe1f5,stroke:#cc0066,stroke-width:2px
+    classDef validationClass fill:#f5e1ff,stroke:#6600cc,stroke-width:2px
+    classDef internalClass fill:#ffe1e1,stroke:#cc0000,stroke-width:2px
+
+    class Config,C101,C102,C103 configClass
+    class IO,I201,I202,I203,I204,I205,I206 ioClass
+    class Network,N301,N302,N303 networkClass
+    class Validation,V401,V402,V403,V404,V405,V406 validationClass
+    class Internal,In501,In502,In503,In504,In505 internalClass
+```
+
 ## Severity Levels
 
 | Level | Meaning | Action |
@@ -29,6 +87,80 @@ Where:
 | ERROR | Operation failed | Can continue with degraded functionality |
 | WARNING | Degraded operation | Continuing with fallback |
 | INFO | Informational | No action required |
+
+---
+
+## Error Handling Decision Tree
+
+```mermaid
+flowchart TD
+    Start([Error Occurred]) --> Category{Error Category}
+
+    Category -->|CONFIG<br/>100-199| ConfigCheck{Severity}
+    Category -->|IO<br/>200-299| IOCheck{Error Type}
+    Category -->|NETWORK<br/>300-399| NetworkCheck{Retryable?}
+    Category -->|VALIDATION<br/>400-499| ValidationCheck{User Input?}
+    Category -->|INTERNAL<br/>500-599| InternalCheck{Recoverable?}
+
+    ConfigCheck -->|FATAL| Abort[Abort Operation]
+    ConfigCheck -->|ERROR| FixConfig[Fix Configuration]
+    FixConfig --> Retry[Retry Operation]
+
+    IOCheck -->|Disk Full<br/>205| Abort
+    IOCheck -->|Corrupt Index<br/>205| Reindex[Re-index]
+    IOCheck -->|File Not Found<br/>201| Skip[Skip File]
+    IOCheck -->|Permission<br/>202| FixPerm[Fix Permissions]
+
+    NetworkCheck -->|Yes| RetryBackoff{Attempts < 5?}
+    NetworkCheck -->|No| Fallback[Use Fallback]
+
+    RetryBackoff -->|Yes| ExponentialBackoff[Exponential Backoff]
+    ExponentialBackoff --> Retry
+    RetryBackoff -->|No| CircuitBreaker[Open Circuit Breaker]
+    CircuitBreaker --> Fallback
+
+    ValidationCheck -->|Yes| UserError[Return Error to User]
+    ValidationCheck -->|No| SanitizeInput[Sanitize & Retry]
+
+    InternalCheck -->|Yes| RetryInternal[Retry with Logging]
+    InternalCheck -->|No| FallbackInternal[Graceful Degradation]
+
+    Fallback --> BM25Only[BM25-only Search]
+    FallbackInternal --> StaticEmbed[Static Embeddings]
+    Skip --> Continue[Continue Processing]
+    Reindex --> Continue
+    FixPerm --> Retry
+    Retry --> Success([Success])
+    SanitizeInput --> Success
+    RetryInternal --> Success
+    BM25Only --> Success
+    StaticEmbed --> Success
+    Continue --> Success
+    UserError --> End([Report to User])
+    Abort --> End
+
+    style Start fill:#e1f5ff,stroke:#0066cc,stroke-width:3px
+    style Success fill:#d4edda,stroke:#28a745,stroke-width:3px
+    style End fill:#f8d7da,stroke:#dc3545,stroke-width:2px
+    style Abort fill:#ffe1e1,stroke:#cc0000,stroke-width:2px
+    style CircuitBreaker fill:#ffe1e1,stroke:#cc0000
+    style Fallback fill:#fff3cd,stroke:#ffc107
+    style BM25Only fill:#fff3cd,stroke:#ffc107
+    style StaticEmbed fill:#fff3cd,stroke:#ffc107
+    style FallbackInternal fill:#fff3cd,stroke:#ffc107
+```
+
+**Decision Guidelines:**
+
+| Scenario | Action | Rationale |
+|----------|--------|-----------|
+| Network timeout | Retry with backoff → Fallback | Transient issues often resolve |
+| Config invalid | Fail fast | User must fix before proceeding |
+| Disk full | Abort immediately | Cannot continue safely |
+| File not found | Skip and continue | Isolated issue, don't block indexing |
+| Embedding fails | Fallback to BM25 | Maintain partial functionality |
+| Index corrupt | Re-index from source | Data can be regenerated |
+| Dimension mismatch | Abort and re-index | Incompatible state requires rebuild |
 
 ---
 
@@ -557,6 +689,40 @@ When circuit is open:
 - Embedding failures use static embeddings
 - Index operations continue without semantic features
 
+### Circuit Breaker State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Closed
+
+    Closed --> Open: 5 consecutive failures
+    Closed --> Closed: Success (reset counter)
+
+    Open --> HalfOpen: After 30s timeout
+    Open --> Open: Request blocked (fail fast)
+
+    HalfOpen --> Closed: Success
+    HalfOpen --> Open: Failure
+
+    note right of Closed
+        Normal operation
+        All requests allowed
+        Failure counter active
+    end note
+
+    note right of Open
+        Fast failure mode
+        Requests blocked
+        Fallback to BM25-only
+    end note
+
+    note right of HalfOpen
+        Testing recovery
+        Single probe request
+        Decide next state
+    end note
+```
+
 ---
 
 ## Retry Behavior
@@ -572,6 +738,154 @@ Retryable errors use exponential backoff:
 | 5 | 1600ms |
 
 With jitter enabled, delays vary by ±10% to prevent thundering herd.
+
+### Retry Exponential Backoff Timeline
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#e1f5ff','primaryBorderColor':'#0066cc'}}}%%
+gantt
+    title Retry Attempts with Exponential Backoff
+    dateFormat X
+    axisFormat %Lms
+
+    section Attempt 1
+    Request 1 :a1, 0, 10
+    Wait 100ms :crit, w1, after a1, 100
+
+    section Attempt 2
+    Request 2 :a2, after w1, 10
+    Wait 200ms :crit, w2, after a2, 200
+
+    section Attempt 3
+    Request 3 :a3, after w2, 10
+    Wait 400ms :crit, w3, after a3, 400
+
+    section Attempt 4
+    Request 4 :a4, after w3, 10
+    Wait 800ms :crit, w4, after a4, 800
+
+    section Attempt 5
+    Request 5 :a5, after w4, 10
+    Final Result :done, after a5, 10
+```
+
+**Notes:**
+- Each retry doubles the wait time (exponential backoff)
+- Jitter adds ±10% randomness to prevent synchronized retries
+- Total max retry time: ~3.1 seconds (100+200+400+800+1600ms)
+- After 5 attempts, operation fails with error
+
+---
+
+## Error Recovery Strategies
+
+### Embedding Failure Recovery Flow
+
+```mermaid
+flowchart TD
+    Start([Embedding Request]) --> Attempt[Attempt Embedding]
+    Attempt --> Check{Success?}
+
+    Check -->|Yes| Return[Return Vector]
+    Check -->|No| CheckRetry{Retryable?<br/>ERR_301/302}
+
+    CheckRetry -->|Yes| Retry{Attempts < 5?}
+    CheckRetry -->|No| Static[Use Static Embeddings]
+
+    Retry -->|Yes| Backoff[Exponential Backoff]
+    Backoff --> Attempt
+    Retry -->|No| CircuitCheck{Circuit Open?}
+
+    CircuitCheck -->|Yes| Static
+    CircuitCheck -->|No| OpenCircuit[Open Circuit<br/>5 Failures]
+    OpenCircuit --> Static
+
+    Static --> Fallback[Fallback to BM25-only]
+    Fallback --> Return
+    Return --> End([Complete])
+
+    style Start fill:#e1f5ff,stroke:#0066cc
+    style End fill:#d4edda,stroke:#28a745
+    style OpenCircuit fill:#ffe1e1,stroke:#cc0000
+    style Static fill:#fff3cd,stroke:#ffc107
+    style Fallback fill:#fff3cd,stroke:#ffc107
+```
+
+### Index Corruption Recovery Flow
+
+```mermaid
+flowchart TD
+    Start([Detect ERR_205]) --> Validate{Can Read<br/>Index?}
+
+    Validate -->|No| Backup{Backup<br/>Exists?}
+    Validate -->|Partial| Partial[Partial Recovery]
+
+    Backup -->|Yes| Restore[Restore from Backup]
+    Backup -->|No| Clean[Delete Corrupt Index]
+
+    Restore --> Test{Test Index}
+    Test -->|Success| Success([Recovery Complete])
+    Test -->|Failed| Clean
+
+    Clean --> Reindex[Full Re-index]
+    Partial --> Reindex
+
+    Reindex --> CheckDisk{Disk Health OK?}
+    CheckDisk -->|No| DiskError([ERR_203: Report Disk Issue])
+    CheckDisk -->|Yes| Build[Build New Index]
+
+    Build --> Verify{Verify Index}
+    Verify -->|Success| Success
+    Verify -->|Failed| DiskError
+
+    style Start fill:#ffe1e1,stroke:#cc0000
+    style Success fill:#d4edda,stroke:#28a745
+    style DiskError fill:#ffe1e1,stroke:#cc0000
+    style Clean fill:#fff3cd,stroke:#ffc107
+    style Reindex fill:#e1f5ff,stroke:#0066cc
+```
+
+### Network Timeout Recovery Flow
+
+```mermaid
+flowchart TD
+    Start([ERR_301: Timeout]) --> Check{Check<br/>Network}
+
+    Check -->|Available| Retry1[Retry: 100ms delay]
+    Check -->|Down| Offline[Offline Mode]
+
+    Retry1 --> Test1{Success?}
+    Test1 -->|Yes| Success([Complete])
+    Test1 -->|No| Retry2[Retry: 200ms delay]
+
+    Retry2 --> Test2{Success?}
+    Test2 -->|Yes| Success
+    Test2 -->|No| Retry3[Retry: 400ms delay]
+
+    Retry3 --> Test3{Success?}
+    Test3 -->|Yes| Success
+    Test3 -->|No| CircuitBreaker{Circuit<br/>Threshold?}
+
+    CircuitBreaker -->|< 5 failures| Continue[Continue Retries]
+    CircuitBreaker -->|≥ 5 failures| OpenCircuit[Open Circuit]
+
+    Continue --> Retry4[Retry: 800ms delay]
+    Retry4 --> Test4{Success?}
+    Test4 -->|Yes| Success
+    Test4 -->|No| OpenCircuit
+
+    OpenCircuit --> Fallback[Fallback Mode]
+    Offline --> Fallback
+
+    Fallback --> BM25[BM25-only Search]
+    BM25 --> Success
+
+    style Start fill:#ffe1f5,stroke:#cc0066
+    style Success fill:#d4edda,stroke:#28a745
+    style OpenCircuit fill:#ffe1e1,stroke:#cc0000
+    style Fallback fill:#fff3cd,stroke:#ffc107
+    style Offline fill:#fff3cd,stroke:#ffc107
+```
 
 ---
 

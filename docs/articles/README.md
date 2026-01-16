@@ -4,6 +4,45 @@ Deep dives, case studies, and thought leadership on building AI-native developer
 
 **Audience**: Engineers, architects, and anyone interested in practical AI engineering insights.
 
+```mermaid
+graph LR
+    subgraph "Architecture & Design"
+        A1[Black Box Architecture]
+        A2[Zero Friction Lessons]
+    end
+
+    subgraph "AI Engineering"
+        B1[AI Engineering Guide]
+        B2[AI-Native PM]
+        B3[Smaller Models Better]
+        B4[Static Embeddings]
+    end
+
+    subgraph "Operations"
+        C1[Debugging MCP]
+        C2[Documentation Lessons]
+    end
+
+    subgraph "Benchmarks"
+        D1[Claude vs AmanMCP]
+    end
+
+    A1 -.->|Modular Design| B2
+    A2 -.->|UX Philosophy| B2
+    B3 -.->|Model Selection| B4
+    C1 -.->|Protocol Issues| B2
+
+    style A1 fill:#e1f5ff
+    style A2 fill:#e1f5ff
+    style B1 fill:#c8e6c9
+    style B2 fill:#c8e6c9
+    style B3 fill:#c8e6c9
+    style B4 fill:#c8e6c9
+    style C1 fill:#ffe0b2
+    style C2 fill:#ffe0b2
+    style D1 fill:#e1f5ff
+```
+
 ---
 
 ## Available Articles

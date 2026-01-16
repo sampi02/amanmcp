@@ -1,12 +1,14 @@
 # Embedding Backend Optimization: A Benchmarking Case Study
 
 > **Learning Objectives:**
+>
 > - Understand how to benchmark embedding backends empirically
 > - Learn trade-offs between performance (55x faster) and complexity
 > - See why "officially supported" does not always mean "actually works"
 > - Apply real-world validation methodology to your own projects
 >
 > **Prerequisites:**
+>
 > - Basic understanding of embeddings and vector search
 > - [Vector Search Concepts](../concepts/vector-search-concepts.md)
 >
@@ -19,6 +21,26 @@
 Embedding generation consumed 80% of our indexing time, making AmanMCP feel slow for large codebases. We hypothesized that switching from Ollama to TEI (Text Embeddings Inference) would provide a 5x speedup based on published benchmarks. After TEI crashed on every Qwen3 model despite "official" Metal support, we discovered MLX as an alternative and achieved a **55x speedup** (60ms vs 3300ms per batch) while maintaining identical embedding quality.
 
 **Key Lesson:** Validate performance claims on your actual hardware before planning around them.
+
+---
+
+## Optimization Journey Timeline
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#2563eb','primaryTextColor':'#fff','primaryBorderColor':'#1e40af','lineColor':'#475569','secondaryColor':'#059669','tertiaryColor':'#dc2626'}}}%%
+timeline
+    title Embedding Backend Optimization Journey
+    section Baseline
+        Ollama Performance : 80% of indexing time<br/>100s for 6.5K chunks · Bottleneck identified
+    section Hypothesis
+        TEI Research : Published 5x speedup<br/>Official Qwen3 support · Promising solution
+    section Validation Attempt
+        TEI Testing : Built from source<br/>Crashed on warm-up · ❌ Failed
+    section Alternative Discovery
+        MLX Testing : Apple Silicon native<br/>60ms per batch · ✅ 55x speedup
+    section Current State
+        MLX Production : 100s to 2s indexing<br/>Quality maintained · 🎯 Successful
+```
 
 ---
 
@@ -175,6 +197,66 @@ When the "obvious" solution fails, alternatives often exist. MLX was purpose-bui
 | Ollama | ~100s | Baseline |
 | **MLX** | **~2s** | **50x faster** |
 
+### Performance Comparison: Ollama vs MLX
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#2563eb','primaryTextColor':'#fff','primaryBorderColor':'#1e40af','lineColor':'#64748b','fontSize':'14px'}}}%%
+graph TB
+    subgraph Ollama["⚠️ Ollama · Baseline"]
+        O1["Sequential HTTP batches"] --> O2["3300ms per batch"]
+        O2 --> O3["6,500 chunks<br/>200 batches"]
+        O3 --> O4["Total: ~100 seconds"]
+        O4 --> O5["❌ User waits 2 minutes"]
+    end
+
+    subgraph MLX["✅ MLX · Optimized"]
+        M1["Native Metal acceleration"] --> M2["60ms per batch"]
+        M2 --> M3["6,500 chunks<br/>200 batches"]
+        M3 --> M4["Total: ~2 seconds"]
+        M4 --> M5["✅ Near-instant indexing"]
+    end
+
+    subgraph Improvement["📊 55x Speedup"]
+        I1["Same model · Qwen3-8B"]
+        I2["Same quality · 4096 dims"]
+        I3["Same results"]
+        I4["50x faster execution"]
+    end
+
+    O5 --> Improvement
+    M5 --> Improvement
+
+    style O1 fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#fff
+    style O5 fill:#dc2626,stroke:#b91c1c,stroke-width:3px,color:#fff
+    style M1 fill:#059669,stroke:#047857,stroke-width:2px,color:#fff
+    style M5 fill:#059669,stroke:#047857,stroke-width:3px,color:#fff
+    style I4 fill:#059669,stroke:#047857,stroke-width:3px,color:#fff
+```
+
+### Backend Latency Breakdown
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#2563eb','primaryTextColor':'#fff','primaryBorderColor':'#1e40af','lineColor':'#64748b','fontSize':'14px'}}}%%
+graph LR
+    subgraph Models["Model Size Comparison"]
+        M1["Qwen3-0.6B<br/>MLX: 30ms<br/>Ollama: ~1000ms"]
+        M2["Qwen3-4B<br/>MLX: 43ms<br/>Ollama: ~2000ms"]
+        M3["⭐ Qwen3-8B<br/>MLX: 60ms<br/>Ollama: ~3300ms"]
+    end
+
+    M1 --> Speedup1["33x faster"]
+    M2 --> Speedup2["46x faster"]
+    M3 --> Speedup3["🚀 55x faster"]
+
+    Speedup1 --> Conclusion["Pattern: Larger models<br/>benefit more from MLX"]
+    Speedup2 --> Conclusion
+    Speedup3 --> Conclusion
+
+    style M3 fill:#059669,stroke:#047857,stroke-width:3px,color:#fff
+    style Speedup3 fill:#059669,stroke:#047857,stroke-width:3px,color:#fff
+    style Conclusion fill:#2563eb,stroke:#1e40af,stroke-width:3px,color:#fff
+```
+
 ### Quality Verification
 
 | Metric | Ollama | MLX | Difference |
@@ -204,6 +286,7 @@ Published benchmarks showing "5x speedup" came from Linux servers with NVIDIA GP
 ### 3. Document Failures Too
 
 This appendix preserving the TEI failure is valuable:
+
 - Saves others from wasting time on the same path
 - Provides a baseline if TEI fixes Qwen3 support later
 - Demonstrates the validation methodology
@@ -283,6 +366,7 @@ curl http://localhost:8000/health
 ```
 
 Expected output:
+
 ```json
 {"status":"healthy","model_status":"ready","loaded_model":"large",...}
 ```
@@ -491,6 +575,7 @@ log show --predicate 'subsystem == "com.apple.xpc.launchd"' --last 5m | grep mlx
 ### The Failure Pattern
 
 All Qwen3 models crashed identically at the "Warming up model" phase, after:
+
 - Model download complete
 - Configuration parsing successful
 - Tokenizer initialization successful
@@ -509,6 +594,7 @@ Despite merged PRs, the Metal implementation remained broken for Qwen3.
 ### Why This Matters
 
 This failure taught us that:
+
 - GitHub PRs do not equal working features
 - "Supported" architectures may only work on specific backends
 - Real hardware testing is irreplaceable
@@ -560,8 +646,3 @@ This failure taught us that:
 - [TEI GitHub](https://github.com/huggingface/text-embeddings-inference)
 - [TEI Metal Build](https://huggingface.co/docs/text-embeddings-inference/local_metal)
 - [TEI Supported Models](https://huggingface.co/docs/text-embeddings-inference/en/supported_models)
-
----
-
-**Original Source:** `archive/research/embedding_optimization_analysis.md`
-**Last Updated:** 2026-01-16

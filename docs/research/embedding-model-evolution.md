@@ -7,6 +7,7 @@
 > **Current Implementation:** See [Embedding Models](./embedding-models.md)
 
 > **Learning Objectives:**
+>
 > - Understand criteria for selecting embedding models
 > - Learn why model choices evolve over time
 > - See trade-offs between quality, speed, integration complexity, and resource usage
@@ -16,6 +17,7 @@
 ## TL;DR
 
 AmanMCP's embedding strategy evolved through four phases:
+
 1. **nomic-embed-text** (via Ollama) - High quality, but Ollama dependency too heavy
 2. **Hugot (MiniLM)** - Pure Go, zero deps, but quality loss (~9%)
 3. **MLX (Qwen3-8B)** - Fastest (55x), highest quality, but RAM-hungry
@@ -25,22 +27,18 @@ Each transition was driven by different priorities: first quality, then simplici
 
 ## The Evolution Timeline
 
-```
-Phase 1 (Dec 2025): nomic-embed-text via Ollama
-  │  81% MTEB, 768 dims, 8K context
-  │  Problem: Ollama dependency violates "It Just Works"
-  ↓
-Phase 2 (Late Dec 2025): Hugot (all-MiniLM-L6-v2)
-  │  70% MTEB, 384 dims, 512 context
-  │  Problem: Quality loss noticeable in code search
-  ↓
-Phase 3 (Jan 2026): MLX with Qwen3-8B
-  │  80%+ MTEB, 4096 dims, 55x faster than Ollama
-  │  Problem: High RAM usage during long sessions
-  ↓
-Phase 4 (Jan 2026): Ollama default, MLX opt-in
-  │  Best balance for typical development workflows
-  └── Current state
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#2563eb','primaryTextColor':'#fff','primaryBorderColor':'#1e40af','lineColor':'#475569','secondaryColor':'#059669','tertiaryColor':'#dc2626'}}}%%
+timeline
+    title Embedding Model Evolution Timeline
+    section Phase 1<br/>Dec 2025
+        nomic-embed-text via Ollama : 81% MTEB · 768 dims · 8K context<br/>Quality ✅ · Setup friction ❌
+    section Phase 2<br/>Late Dec 2025
+        Hugot (all-MiniLM-L6-v2) : 70% MTEB · 384 dims · 512 context<br/>Zero-config ✅ · Quality loss ❌
+    section Phase 3<br/>Jan 2026
+        MLX with Qwen3-8B : 80%+ MTEB · 4096 dims<br/>55x faster ✅ · High RAM ❌
+    section Phase 4<br/>Jan 2026
+        Ollama default, MLX opt-in : Best balance ✅<br/>Current state 🎯
 ```
 
 ## Phase 1: nomic-embed-text (Original Decision)
@@ -68,6 +66,7 @@ The initial embedding model selection was driven by these constraints:
 | Dimensions | 768 |
 
 **Alternatives Rejected:**
+
 - **OpenAI Embeddings**: Best quality but requires API key, not local, costs money
 - **sentence-transformers**: Requires Python runtime, complex setup
 - **Static hash embeddings**: Zero semantic understanding
@@ -155,6 +154,7 @@ final_score = RRF(0.35 * BM25_score, 0.65 * Semantic_score)
 ### What Didn't Work
 
 The quality loss became noticeable in real-world code search:
+
 - Shorter context (512 tokens) truncated large functions
 - Lower dimensions (384 vs 768) reduced semantic expressiveness
 - Code-specific queries often returned less relevant results
@@ -169,6 +169,7 @@ The quality loss became noticeable in real-world code search:
 ### Why the Change
 
 Embedding generation consumed 80% of indexing time. For 6,500 chunks:
+
 - **Ollama:** ~48 minutes
 - **MLX:** ~3 minutes (16x faster)
 
@@ -183,6 +184,7 @@ This slow iteration hurt developer experience when tuning search quality.
 | Ollama | Works | ~3300ms | Baseline |
 
 MLX achieved this through:
+
 - Native Apple Silicon optimization
 - Parallel batch processing
 - Efficient Metal GPU utilization
@@ -276,16 +278,20 @@ Each phase had fundamentally different priorities:
 
 Each choice occupied a different point on the trade-off curve:
 
-```
-Quality
-  ↑
-  │     * Qwen3-8B (MLX/Ollama)
-  │   * nomic-embed-text
-  │
-  │  * MiniLM (Hugot)
-  │
-  │* Static
-  └────────────────────→ Simplicity
+```mermaid
+quadrantChart
+    title Quality vs Simplicity Trade-off
+    x-axis Low Simplicity --> High Simplicity
+    y-axis Low Quality --> High Quality
+    quadrant-1 Ideal Zone
+    quadrant-2 Complex but Worth It
+    quadrant-3 Avoid
+    quadrant-4 Easy but Insufficient
+    "Qwen3-8B (MLX)": [0.3, 0.85]
+    "Qwen3-8B (Ollama)": [0.5, 0.82]
+    "nomic-embed-text": [0.4, 0.81]
+    "MiniLM (Hugot)": [0.85, 0.70]
+    "Static": [0.95, 0.30]
 ```
 
 **Lesson:** There's no universally "best" model - only best for your constraints.
@@ -324,6 +330,33 @@ General models struggle with code vocabulary:
 ## Model Selection Decision Framework
 
 Use this framework when choosing embedding models:
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#2563eb','primaryTextColor':'#fff','primaryBorderColor':'#1e40af','lineColor':'#64748b','fontSize':'14px'}}}%%
+flowchart TD
+    Start["🎯 Model Selection"] --> RAM{RAM Available?}
+
+    RAM -->|"< 8GB"| Lightweight["💡 Lightweight Models<br/>all-MiniLM · Hugot"]
+    RAM -->|"8-16GB"| Quality{Quality Priority?}
+    RAM -->|"> 16GB"| Performance{Speed Critical?}
+
+    Quality -->|High| Code1{Code Search?}
+    Quality -->|Balanced| Qwen06["⭐ qwen3-0.6b<br/>Recommended"]
+
+    Code1 -->|Yes| CodeSpec["🔧 Code-Specialized<br/>nomic-embed-code<br/>jina-v2-base-code"]
+    Code1 -->|No| GeneralHQ["🎓 High Quality General<br/>nomic-embed-text<br/>bge-m3"]
+
+    Performance -->|Yes| MLX["⚡ MLX Backend<br/>Qwen3-8B<br/>55x faster"]
+    Performance -->|No| Ollama["🔄 Ollama Backend<br/>Qwen3-8B<br/>Stable · Lower RAM"]
+
+    style Start fill:#2563eb,stroke:#1e40af,stroke-width:3px,color:#fff
+    style Lightweight fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:#fff
+    style Qwen06 fill:#059669,stroke:#047857,stroke-width:3px,color:#fff
+    style CodeSpec fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#fff
+    style GeneralHQ fill:#0891b2,stroke:#0e7490,stroke-width:2px,color:#fff
+    style MLX fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#fff
+    style Ollama fill:#059669,stroke:#047857,stroke-width:2px,color:#fff
+```
 
 ### Step 1: Define Constraints
 
@@ -392,10 +425,3 @@ When switching embedding models:
 - [Embedding Models](./embedding-models.md) - Current model comparison and recommendations
 - [Specialization vs Generalization](./specialization-vs-generalization.md) - Trade-offs in model selection
 - [Query Expansion](./query-expansion-asymmetric.md) - Improving search quality at query time
-
----
-
-**Original Source:** `archive/docs-v1/decisions-superseded/ADR-002-embedding-model-nomic.md`
-**Related ADRs:** ADR-002, ADR-005, ADR-023, ADR-035, ADR-037
-**Status:** Historical (documents evolution through January 2026)
-**Last Updated:** 2026-01-16

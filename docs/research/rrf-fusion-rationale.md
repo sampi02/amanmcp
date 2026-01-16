@@ -1,11 +1,13 @@
 # Reciprocal Rank Fusion: Combining BM25 and Vector Search
 
 > **Learning Objectives:**
+>
 > - Understand why direct score combination doesn't work for hybrid search
 > - Learn the Reciprocal Rank Fusion (RRF) algorithm
 > - Know when to use RRF and how to tune its parameters
 >
 > **Prerequisites:**
+>
 > - [Hybrid Search Concepts](../concepts/hybrid-search.md)
 > - Basic understanding of BM25 and vector search
 >
@@ -36,6 +38,23 @@ Vector Result:
   chunk_A: score = 0.87
   chunk_D: score = 0.71
 ```
+
+```mermaid
+---
+config:
+  themeVariables:
+    xyChart:
+      backgroundColor: transparent
+---
+xychart-beta
+    title "Score Incompatibility: BM25 vs Cosine Similarity"
+    x-axis ["chunk_A", "chunk_B", "chunk_C", "chunk_D"]
+    y-axis "Score Value" 0 --> 20
+    bar [18.5, 12.3, 8.7, 0]
+    bar [0.87, 0, 0.92, 0.71]
+```
+
+**Legend:** Blue = BM25 scores (0-25 range), Orange = Vector similarity (0-1 range)
 
 How do you combine these? You cannot simply add or average them:
 
@@ -100,10 +119,24 @@ RRF_score(d) = sum over all sources of: weight_i / (k + rank_i)
 ```
 
 Where:
+
 - `d` = document being scored
 - `weight_i` = weight for search source i
 - `k` = smoothing constant (typically 60)
 - `rank_i` = position in ranked list from source i (1-indexed)
+
+```mermaid
+flowchart TD
+    A[Start: Query] --> B[BM25 Search]
+    A --> C[Vector Search]
+    B --> D[BM25 Ranked List<br/>1. chunk_A score=18.5<br/>2. chunk_B score=12.3<br/>3. chunk_C score=8.7]
+    C --> E[Vector Ranked List<br/>1. chunk_C score=0.92<br/>2. chunk_A score=0.87<br/>3. chunk_D score=0.71]
+    D --> F[Convert to Ranks]
+    E --> F
+    F --> G[Calculate RRF Scores<br/>chunk_A: 0.35/61 + 0.65/62 = 0.0162<br/>chunk_C: 0.35/63 + 0.65/61 = 0.0162]
+    G --> H[Sort by RRF Score]
+    H --> I[Final Results<br/>1. chunk_A tie chunk_C<br/>2. chunk_B<br/>3. chunk_D]
+```
 
 ### Step-by-Step Example
 
@@ -120,6 +153,7 @@ k = 60
 Calculate RRF score for each document:
 
 **chunk_A:**
+
 ```
 BM25:   0.35 / (60 + 1) = 0.35 / 61 = 0.00574
 Vector: 0.65 / (60 + 2) = 0.65 / 62 = 0.01048
@@ -127,6 +161,7 @@ Total:  0.01622
 ```
 
 **chunk_B:**
+
 ```
 BM25:   0.35 / (60 + 2) = 0.35 / 62 = 0.00565
 Vector: not in list, use missing_rank = 4
@@ -135,6 +170,7 @@ Total:  0.01581
 ```
 
 **chunk_C:**
+
 ```
 BM25:   0.35 / (60 + 3) = 0.35 / 63 = 0.00556
 Vector: 0.65 / (60 + 1) = 0.65 / 61 = 0.01066
@@ -142,6 +178,7 @@ Total:  0.01622
 ```
 
 **chunk_D:**
+
 ```
 BM25:   not in list, use missing_rank = 4
         0.35 / (60 + 4) = 0.35 / 64 = 0.00547
@@ -177,6 +214,24 @@ k=10:   11/20 = 1.82x
 k=60:   61/70 = 1.15x
 k=100:  101/110 = 1.09x
 ```
+
+```mermaid
+---
+config:
+  themeVariables:
+    xyChart:
+      backgroundColor: transparent
+---
+xychart-beta
+    title "k-Value Impact on Rank Stability"
+    x-axis "Document Rank" [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    y-axis "RRF Score Contribution" 0 --> 0.10
+    line [0.091, 0.083, 0.077, 0.071, 0.067, 0.063, 0.059, 0.056, 0.053, 0.050]
+    line [0.016, 0.016, 0.016, 0.015, 0.015, 0.015, 0.014, 0.014, 0.014, 0.014]
+    line [0.010, 0.010, 0.010, 0.010, 0.009, 0.009, 0.009, 0.009, 0.009, 0.009]
+```
+
+**Legend:** Blue = k=10 (aggressive), Orange = k=60 (balanced), Red = k=100 (flat)
 
 ### k Trade-offs
 
@@ -375,6 +430,7 @@ type FusedResult struct {
 ```
 
 These help with:
+
 - Debugging why a document ranked where it did
 - Building validation suites
 - User-facing explanations ("found by keyword match")
@@ -425,8 +481,3 @@ After normalization, the top result has score 1.0, making it easy to understand 
 
 - [Hybrid Search Concepts](../concepts/hybrid-search.md) - How BM25 and vector search combine
 - [Query Expansion](./query-expansion-asymmetric.md) - Why BM25 needs expansion but vector search doesn't
-
----
-
-**Original Source:** `.aman-pm/decisions/ADR-004` (internal)
-**Last Updated:** 2026-01-16

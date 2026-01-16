@@ -1,11 +1,13 @@
 # When Contextual Retrieval Backfires: A Regression Case Study
 
 > **Learning Objectives:**
+>
 > - Understand how enhancements can cause unexpected regressions
 > - Learn diagnostic techniques for vector search failures
 > - Know the trade-offs between model size and quality for code search
 >
 > **Prerequisites:**
+>
 > - [Contextual Retrieval Decision](./contextual-retrieval-decision.md)
 > - Basic understanding of embeddings
 >
@@ -79,6 +81,30 @@ AMANMCP_BM25_WEIGHT=0 AMANMCP_SEMANTIC_WEIGHT=1 \
   amanmcp search "func NewHNSWStore" --limit 5
 ```
 
+```mermaid
+flowchart TD
+    A[Start Investigation] --> B{Test Components<br/>in Isolation}
+
+    B --> C[BM25-only Test]
+    B --> D[Vector-only Test]
+    B --> E[Hybrid Test]
+
+    C --> F[✓ Working Correctly]
+    D --> G[✗ Returns Wrong Results]
+    E --> H[△ Partially Working<br/>BM25 saving it]
+
+    F --> I[Problem NOT in BM25]
+    G --> J[Problem IS in Vector]
+    H --> J
+
+    J --> K[Focus Investigation<br/>on Semantic Search Path]
+
+    style F fill:#90EE90
+    style G fill:#FFB6C6
+    style H fill:#FFE4B5
+    style K fill:#87CEEB
+```
+
 **Critical Finding:**
 
 | Component | Status |
@@ -103,19 +129,20 @@ The pattern suggested the embedding space had collapsed - all chunks were landin
 
 **Visual representation of the problem:**
 
-```
-Normal embedding space:
-    Code -------- Search -------- Docs
-    chunks       query            chunks
-         \        |              /
-          \       v             /
-           \   (finds code)    /
-            \_______|_________/
+```mermaid
+graph TB
+    subgraph Normal["Normal Embedding Space"]
+        C1[Code Chunks] ---|separated| Q1[Search Query]
+        Q1 ---|separated| D1[Doc Chunks]
+        Q1 -.finds.-> C1
+    end
 
-Collapsed embedding space:
-    All chunks + queries
-           ↓
-    [single cluster] → Always returns same files
+    subgraph Collapsed["Collapsed Embedding Space"]
+        ALL[All Chunks + Query<br/>clustered together] --> SAME[Always returns<br/>same files]
+    end
+
+    style Normal fill:#90EE90
+    style Collapsed fill:#FFB6C6
 ```
 
 ### Step 3: Hypothesis Formation
@@ -139,6 +166,26 @@ External research validated our hypotheses. [ByteRover's analysis](https://www.b
 ## Root Cause: Multi-Factor Interaction
 
 The regression wasn't caused by a single bug - it was a perfect storm of interacting factors.
+
+```mermaid
+graph TD
+    A[Complete Semantic<br/>Search Failure] --> B[Small Model<br/>0.6B params]
+    A --> C[Prefix Dominance<br/>Common boilerplate]
+    A --> D[Missing Query<br/>Instruction]
+    A --> E[Doc Type Clustering<br/>Verbose vs terse]
+
+    B --> F[Limited semantic<br/>capacity]
+    C --> F
+    D --> F
+    E --> F
+
+    F --> G[Multi-Factor<br/>Interaction Effect]
+
+    style A fill:#FFB6C6
+    style G fill:#FFE4B5
+```
+
+**Key Insight:** No single factor caused failure - it was their interaction.
 
 ### Factor 1: Small Embedding Model Limitations
 
@@ -311,6 +358,7 @@ type SearchMetrics struct {
 ```
 
 **Prevention:** When adding features, test:
+
 - Feature in isolation
 - Feature combined with each existing component
 - Full system integration
@@ -334,6 +382,7 @@ Without isolation testing, our hybrid search appeared "partially working" - BM25
 | 8B | Excellent | Good |
 
 **Guidance:**
+
 - General text: 0.6B models often sufficient
 - Specialized domains (code, legal, medical): Consider 4B+ models
 - Critical applications: Test on your actual data, not just benchmarks
@@ -343,11 +392,13 @@ Without isolation testing, our hybrid search appeared "partially working" - BM25
 **Pattern:** When multiple factors contribute similar signals, the embedding space can collapse into a single region, making similarity search useless.
 
 **Signs of collapse:**
+
 - All similarity scores are very high (0.9+)
 - Same results for different queries
 - No meaningful ranking differentiation
 
 **Prevention:**
+
 - Avoid repetitive prefixes/suffixes
 - Test embedding diversity with visualization
 - Monitor similarity score distributions
@@ -357,6 +408,7 @@ Without isolation testing, our hybrid search appeared "partially working" - BM25
 **Pattern:** A model's performance on general benchmarks (like MTEB) doesn't predict its performance on specialized tasks.
 
 **Our case:**
+
 - MTEB score: ~94% (excellent)
 - Code retrieval: ~33% (catastrophic)
 
@@ -367,6 +419,7 @@ Without isolation testing, our hybrid search appeared "partially working" - BM25
 **Pattern:** Quick fixes that restore functionality may mask underlying issues.
 
 **Our situation:**
+
 - Workaround: Increase BM25 weight
 - Result: System works for most queries
 - Reality: Vector search is still fundamentally limited
@@ -396,8 +449,3 @@ The most important lesson: **feature interactions are unpredictable**. The same 
 - [Contextual Retrieval Decision](./contextual-retrieval-decision.md) - The feature we implemented
 - [Embedding Model Evolution](./embedding-model-evolution.md) - Why model choice matters
 - [Vocabulary Mismatch Analysis](./vocabulary-mismatch-analysis.md) - The original problem CR was solving
-
----
-
-**Original Source:** `.aman-pm/postmortems/RCA-015` (internal)
-**Last Updated:** 2026-01-16

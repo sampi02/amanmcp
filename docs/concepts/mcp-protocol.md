@@ -21,38 +21,63 @@ MCP (Model Context Protocol) is an open protocol that standardizes how AI applic
 
 Every AI app needed custom integrations:
 
-```
-┌─────────┐   Custom API   ┌───────────┐
-│ Claude  │◄──────────────►│ Codebase  │
-└─────────┘                └───────────┘
-                           ┌───────────┐
-┌─────────┐   Custom API   │  GitHub   │
-│ Cursor  │◄──────────────►├───────────┤
-└─────────┘   Another API  │   Docs    │
-                           └───────────┘
+```mermaid
+graph LR
+    Claude[Claude]
+    Cursor[Cursor]
+    Codebase[Codebase]
+    GitHub[GitHub]
+    Docs[Docs]
 
-Result: N clients × M tools = N×M integrations
+    Claude -.Custom API.-> Codebase
+    Cursor -.Custom API.-> GitHub
+    Cursor -.Another API.-> Docs
+
+    Note[Result: N clients × M tools = N×M integrations]
+
+    style Claude fill:#f9f,stroke:#333,stroke-width:2px
+    style Cursor fill:#f9f,stroke:#333,stroke-width:2px
+    style Codebase fill:#bbf,stroke:#333,stroke-width:2px
+    style GitHub fill:#bbf,stroke:#333,stroke-width:2px
+    style Docs fill:#bbf,stroke:#333,stroke-width:2px
 ```
+
+**Result:** N clients × M tools = N×M integrations
 
 ### After MCP
 
 One protocol, universal compatibility:
 
-```
-┌─────────┐                 ┌───────────┐
-│ Claude  │◄──┐             │ Codebase  │
-└─────────┘   │             └─────┬─────┘
-              │   MCP             │
-┌─────────┐   │             ┌─────┴─────┐
-│ Cursor  │◄──┴────────────►│ MCP Server│
-└─────────┘                 └─────┬─────┘
-              │   MCP             │
-┌─────────┐   │             ┌─────┴─────┐
-│ Any AI  │◄──┘             │ Any Tool  │
-└─────────┘                 └───────────┘
+```mermaid
+graph TB
+    subgraph Clients
+        Claude[Claude]
+        Cursor[Cursor]
+        AnyAI[Any AI]
+    end
 
-Result: N + M integrations (linear!)
+    subgraph Servers
+        MCPServer[MCP Server]
+        Codebase[Codebase]
+        AnyTool[Any Tool]
+    end
+
+    Claude <-->|MCP| MCPServer
+    Cursor <-->|MCP| MCPServer
+    AnyAI <-->|MCP| MCPServer
+
+    MCPServer --> Codebase
+    MCPServer --> AnyTool
+
+    style Claude fill:#f9f,stroke:#333,stroke-width:2px
+    style Cursor fill:#f9f,stroke:#333,stroke-width:2px
+    style AnyAI fill:#f9f,stroke:#333,stroke-width:2px
+    style MCPServer fill:#9f9,stroke:#333,stroke-width:3px
+    style Codebase fill:#bbf,stroke:#333,stroke-width:2px
+    style AnyTool fill:#bbf,stroke:#333,stroke-width:2px
 ```
+
+**Result:** N + M integrations (linear!)
 
 ---
 
@@ -60,18 +85,19 @@ Result: N + M integrations (linear!)
 
 ### Client-Server Model
 
-```
-┌──────────────────┐        ┌──────────────────┐
-│   MCP CLIENT     │        │   MCP SERVER     │
-│  (Claude Code)   │◄──────►│   (AmanMCP)      │
-│                  │  JSON  │                  │
-│  - Sends queries │  RPC   │  - Handles tools │
-│  - Uses results  │        │  - Returns data  │
-└──────────────────┘        └──────────────────┘
+```mermaid
+graph LR
+    Client["MCP CLIENT<br/>(Claude Code)<br/><br/>- Sends queries<br/>- Uses results"]
+    Server["MCP SERVER<br/>(AmanMCP)<br/><br/>- Handles tools<br/>- Returns data"]
+
+    Client <-->|JSON-RPC| Server
+
+    style Client fill:#f9f,stroke:#333,stroke-width:2px
+    style Server fill:#9f9,stroke:#333,stroke-width:2px
 ```
 
-**Client**: AI application that uses tools (Claude Code, Cursor)
-**Server**: Tool provider that exposes functionality (AmanMCP)
+**Client**: AI application that uses tools (Claude Code, Cursor)  
+**Server**: Tool provider that exposes functionality (AmanMCP)  
 **Transport**: Communication layer (stdio, SSE, HTTP)
 
 ### The Three Primitives
@@ -195,20 +221,80 @@ MCP uses JSON-RPC for communication:
 
 ### Lifecycle
 
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+
+    Client->>Server: initialize
+    Server->>Client: initialize response
+
+    Client->>Server: tools/list
+    Server->>Client: available tools
+
+    Client->>Server: tools/call (search)
+    Server->>Client: search results
+
+    Client->>Server: (more interactions)
 ```
-Client                          Server
-   │                               │
-   │──── initialize ──────────────►│
-   │◄─── initialize response ──────│
-   │                               │
-   │──── tools/list ──────────────►│
-   │◄─── available tools ──────────│
-   │                               │
-   │──── tools/call (search) ─────►│
-   │◄─── search results ───────────│
-   │                               │
-   │──── (more interactions) ─────►│
-   │                               │
+
+### Complete MCP Lifecycle
+
+A comprehensive view of the full MCP lifecycle from initialization to shutdown:
+
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client<br/>(Claude Code)
+    participant Server as MCP Server<br/>(AmanMCP)
+    participant Search as Search Engine
+
+    Note over Client,Server: Initialization Phase
+    Client->>Server: initialize (capabilities, version)
+    activate Server
+    Server->>Client: initialize response (server capabilities)
+    deactivate Server
+
+    Note over Client,Server: Discovery Phase
+    Client->>Server: tools/list
+    activate Server
+    Server->>Client: [search, lookup, similar, index-status]
+    deactivate Server
+
+    Client->>Server: resources/list
+    activate Server
+    Server->>Client: [file://.., indexed files]
+    deactivate Server
+
+    Note over Client,Server: Request/Response Phase
+    Client->>Server: tools/call: search("authentication", limit: 10)
+    activate Server
+    Server->>Search: Execute hybrid search
+    activate Search
+    Search->>Search: BM25 + Vector → RRF
+    Search->>Server: Top 10 results
+    deactivate Search
+    Server->>Client: Formatted results with code chunks
+    deactivate Server
+
+    Client->>Server: resources/read (file://auth.go)
+    activate Server
+    Server->>Client: File contents
+    deactivate Server
+
+    Note over Client,Server: Optional: Progress Reporting
+    Client->>Server: tools/call: reindex (with progress token)
+    activate Server
+    Server-->>Client: progress notification (10% complete)
+    Server-->>Client: progress notification (50% complete)
+    Server-->>Client: progress notification (100% complete)
+    Server->>Client: Reindex complete
+    deactivate Server
+
+    Note over Client,Server: Shutdown Phase
+    Client->>Server: shutdown
+    activate Server
+    Server->>Client: shutdown acknowledgment
+    deactivate Server
 ```
 
 ---
@@ -265,14 +351,13 @@ func (s *Server) ListResources() []mcp.Resource {
 
 AmanMCP uses stdio transport (simplest):
 
-```
-Claude Code                     AmanMCP
-    │                              │
-    │──── stdin ─────────────────►│
-    │     (JSON-RPC request)       │
-    │                              │
-    │◄─── stdout ─────────────────│
-    │     (JSON-RPC response)      │
+```mermaid
+sequenceDiagram
+    participant Claude Code
+    participant AmanMCP
+
+    Claude Code->>AmanMCP: stdin (JSON-RPC request)
+    AmanMCP->>Claude Code: stdout (JSON-RPC response)
 ```
 
 Configuration in Claude Code:
@@ -382,44 +467,219 @@ func handleSearch(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolRe
 }
 ```
 
+### MCP Error Handling Flow
+
+How errors are handled and propagated in the MCP protocol:
+
+```mermaid
+flowchart TB
+    Start([Client Request]) --> Validate{Validate<br/>Request}
+
+    Validate -->|Invalid JSON-RPC| E1["Return Error<br/>Code: -32700<br/>Parse error"]
+    Validate -->|Unknown method| E2["Return Error<br/>Code: -32601<br/>Method not found"]
+    Validate -->|Valid| CheckParams{Validate<br/>Parameters}
+
+    CheckParams -->|Missing required| E3["Return Error<br/>Code: -32602<br/>Invalid params<br/>Message: 'query required'"]
+    CheckParams -->|Wrong type| E4["Return Error<br/>Code: -32602<br/>Invalid params<br/>Message: 'query must be string'"]
+    CheckParams -->|Valid| Execute[Execute Tool]
+
+    Execute --> ExecResult{Execution<br/>Result}
+
+    ExecResult -->|Success| Success["Return Success<br/>Code: 200<br/>Result: {...}"]
+    ExecResult -->|Business Error| E5["Return Error<br/>Code: -32603<br/>Internal error<br/>Log detailed error"]
+    ExecResult -->|Timeout| E6["Return Error<br/>Code: -32000<br/>Server error<br/>Message: 'operation timeout'"]
+    ExecResult -->|Cancelled| E7["Return Error<br/>Code: -32000<br/>Server error<br/>Message: 'operation cancelled'"]
+
+    E1 --> Response([JSON-RPC Error Response])
+    E2 --> Response
+    E3 --> Response
+    E4 --> Response
+    E5 --> Response
+    E6 --> Response
+    E7 --> Response
+    Success --> SuccessResp([JSON-RPC Success Response])
+
+    subgraph ErrorCodes["MCP Error Codes"]
+        direction TB
+        Codes["
+        Standard JSON-RPC:
+        • -32700: Parse error
+        • -32600: Invalid request
+        • -32601: Method not found
+        • -32602: Invalid params
+        • -32603: Internal error
+
+        MCP-specific:
+        • -32000: Server error
+        • -32001: Resource not found
+        • -32002: Resource access denied
+        "]
+    end
+
+    Response --> ErrorCodes
+    SuccessResp --> ErrorCodes
+
+    style Start fill:#3498db,stroke-width:2px
+    style Validate fill:#fff9c4
+    style CheckParams fill:#fff9c4
+    style ExecResult fill:#fff9c4
+    style E1 fill:#e74c3c,stroke-width:2px
+    style E2 fill:#e74c3c,stroke-width:2px
+    style E3 fill:#f39c12,stroke-width:2px
+    style E4 fill:#f39c12,stroke-width:2px
+    style E5 fill:#e74c3c,stroke-width:2px
+    style E6 fill:#e74c3c,stroke-width:2px
+    style E7 fill:#e74c3c,stroke-width:2px
+    style Success fill:#27ae60,stroke-width:2px
+    style Execute fill:#9b59b6,stroke-width:2px
+    style Response fill:#ffccbc
+    style SuccessResp fill:#c8e6c9
+    style ErrorCodes fill:#e1f5ff
+```
+
+**Error Response Format:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32602,
+    "message": "Invalid params",
+    "data": {
+      "parameter": "query",
+      "issue": "required parameter missing"
+    }
+  }
+}
+```
+
+**Best Practices:**
+1. **Validate early**: Check parameters before expensive operations
+2. **Use appropriate codes**: Standard codes for protocol errors, custom for business logic
+3. **Log internally**: Detailed errors in logs, generic messages to clients
+4. **Include context**: Use `data` field for debugging information
+
 ---
 
 ## AmanMCP Integration Flow
 
 ### Full Request Flow
 
+```mermaid
+graph TB
+    User["User types in Claude<br/>'Where is authentication handled?'"]
+    ClaudeCode["Claude Code<br/>(MCP Client)<br/>Decides to use AmanMCP search tool"]
+    AmanMCP["AmanMCP<br/>(MCP Server)<br/>tools/call: search('authentication')"]
+    SearchEngine["Hybrid Search Engine<br/>BM25 + Vector → RRF Fusion"]
+    Results["Results (10 chunks)<br/>auth.go, session.go, middleware.go"]
+    Response["Claude Response<br/>'Authentication is handled in auth.go...'"]
+
+    User --> ClaudeCode
+    ClaudeCode -->|JSON-RPC via stdio| AmanMCP
+    AmanMCP --> SearchEngine
+    SearchEngine --> Results
+    Results --> Response
+
+    style User fill:#ffe,stroke:#333,stroke-width:2px
+    style ClaudeCode fill:#f9f,stroke:#333,stroke-width:2px
+    style AmanMCP fill:#9f9,stroke:#333,stroke-width:2px
+    style SearchEngine fill:#bbf,stroke:#333,stroke-width:2px
+    style Results fill:#fdb,stroke:#333,stroke-width:2px
+    style Response fill:#bfb,stroke:#333,stroke-width:2px
 ```
-┌──────────────┐
-│ User types   │  "Where is authentication handled?"
-│ in Claude    │
-└──────┬───────┘
-       ▼
-┌──────────────┐
-│ Claude Code  │  Decides to use AmanMCP search tool
-│ (MCP Client) │
-└──────┬───────┘
-       │ JSON-RPC via stdio
-       ▼
-┌──────────────┐
-│   AmanMCP    │  tools/call: search("authentication")
-│ (MCP Server) │
-└──────┬───────┘
-       ▼
-┌──────────────┐
-│ Hybrid Search│  BM25 + Vector → RRF Fusion
-│   Engine     │
-└──────┬───────┘
-       ▼
-┌──────────────┐
-│   Results    │  auth.go, session.go, middleware.go
-│  (10 chunks) │
-└──────┬───────┘
-       ▼
-┌──────────────┐
-│   Claude     │  "Authentication is handled in auth.go..."
-│  Response    │
-└──────────────┘
+
+### Integration Architecture
+
+How MCP integrates with AmanMCP's search engine components:
+
+```mermaid
+graph TB
+    subgraph "MCP Client Layer"
+        Client[Claude Code / Cursor]
+    end
+
+    subgraph "MCP Server Layer (AmanMCP)"
+        MCPServer[MCP Server<br/>JSON-RPC Handler]
+        ToolRouter[Tool Router]
+
+        subgraph "Tool Handlers"
+            SearchTool[search handler]
+            LookupTool[lookup handler]
+            SimilarTool[similar handler]
+            StatusTool[index-status handler]
+        end
+
+        ResourceMgr[Resource Manager]
+    end
+
+    subgraph "Search Engine Layer"
+        SearchEngine[Hybrid Search Engine]
+
+        subgraph "Search Components"
+            BM25[BM25 Index]
+            Vector[Vector Store<br/>HNSW]
+            RRF[RRF Fusion<br/>k=60]
+        end
+    end
+
+    subgraph "Storage Layer"
+        SQLite[(SQLite<br/>Metadata)]
+        VectorDB[(Vector DB<br/>Embeddings)]
+        FSWatcher[File System<br/>Watcher]
+    end
+
+    subgraph "Indexing Pipeline"
+        Scanner[File Scanner]
+        Chunker[tree-sitter<br/>Chunker]
+        Embedder[Embedder<br/>Ollama/MLX]
+    end
+
+    Client <-->|JSON-RPC<br/>stdio| MCPServer
+    MCPServer --> ToolRouter
+    ToolRouter --> SearchTool
+    ToolRouter --> LookupTool
+    ToolRouter --> SimilarTool
+    ToolRouter --> StatusTool
+
+    SearchTool --> SearchEngine
+    LookupTool --> SearchEngine
+    SimilarTool --> SearchEngine
+    StatusTool --> SearchEngine
+
+    MCPServer --> ResourceMgr
+    ResourceMgr --> SQLite
+
+    SearchEngine --> BM25
+    SearchEngine --> Vector
+    BM25 --> RRF
+    Vector --> RRF
+
+    BM25 <--> SQLite
+    Vector <--> VectorDB
+
+    FSWatcher -->|file changes| Scanner
+    Scanner --> Chunker
+    Chunker --> Embedder
+    Embedder --> BM25
+    Embedder --> Vector
+
+    style Client fill:#f9f,stroke:#333,stroke-width:2px
+    style MCPServer fill:#9f9,stroke:#333,stroke-width:3px
+    style SearchEngine fill:#bbf,stroke:#333,stroke-width:2px
+    style RRF fill:#fdb,stroke:#333,stroke-width:2px
+    style SQLite fill:#ddd,stroke:#333,stroke-width:2px
+    style VectorDB fill:#ddd,stroke:#333,stroke-width:2px
 ```
+
+This diagram shows:
+
+- **MCP Client Layer**: AI assistants (Claude Code, Cursor) connect via JSON-RPC over stdio
+- **MCP Server Layer**: Handles protocol, routes to tool handlers
+- **Tool Handlers**: Implement search, lookup, similar, and status operations
+- **Search Engine Layer**: Hybrid search with BM25 + Vector → RRF fusion
+- **Storage Layer**: SQLite for metadata, Vector DB for embeddings
+- **Indexing Pipeline**: File scanning → chunking → embedding → storage
 
 ### Tool Responses
 

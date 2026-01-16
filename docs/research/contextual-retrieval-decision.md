@@ -1,11 +1,13 @@
 # Contextual Retrieval for Code Search: An Implementation Case Study
 
 > **Learning Objectives:**
+>
 > - Understand the vocabulary mismatch problem in semantic code search
 > - Learn how to evaluate and apply research papers to production systems
 > - See trade-offs between index-time and query-time approaches
 >
 > **Prerequisites:**
+>
 > - [Vector Search Concepts](../concepts/vector-search-concepts.md)
 > - [Hybrid Search](../concepts/hybrid-search.md)
 > - Basic understanding of embeddings
@@ -19,6 +21,26 @@
 ## TL;DR
 
 Semantic search fails when queries use natural language but code uses technical identifiers. We implemented Anthropic's contextual retrieval approach to prepend LLM-generated context to code chunks before embedding, bridging the vocabulary gap between "search function" and `func (e *Engine) Search()`. Pattern-based fallback ensures zero-config operation without external dependencies.
+
+---
+
+## Contextual Retrieval Decision Timeline
+
+Our journey from discovery to implementation:
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#3498db','primaryTextColor':'#fff','primaryBorderColor':'#2980b9','lineColor':'#2c3e50','secondaryColor':'#27ae60','tertiaryColor':'#e74c3c','background':'#ecf0f1','mainBkg':'#ecf0f1','secondBkg':'#bdc3c7'}}}%%
+timeline
+    title Contextual Retrieval Evolution
+    section Problem Discovery
+        Vocabulary Mismatch Found : 75% pass rate - search function fails - Abstract queries don't match code
+    section Research Phase
+        Anthropic Paper : Contextual Retrieval concept - 49-67% improvement - Applicable to code search
+    section Design Phase
+        Index-time vs Query-time : Chose index-time with LLM + Pattern fallback - Zero-config priority
+    section Implementation
+        Context Generation : qwen3 0.6b for speed with pattern fallback - Expected 92% pass rate
+```
 
 ---
 
@@ -38,6 +60,7 @@ func (e *Engine) Search(ctx context.Context, query string) ([]Result, error) {
 ```
 
 The word "search" appears, but:
+
 - **No context** says this is THE primary search function
 - **No explanation** of what hybrid search means
 - **No indication** this orchestrates the entire search pipeline
@@ -61,18 +84,19 @@ flowchart LR
     User["User Query<br/>'Search function'"]
     Code["Code Chunk<br/>'func Search(...)'"]
 
-    User -->|"Embedding"| UV["Query Vector"]
-    Code -->|"Embedding"| CV["Code Vector"]
+    User -->|Embedding| UV["Query Vector"]
+    Code -->|Embedding| CV["Code Vector"]
 
     UV x--x|"Far apart<br/>Different vocabulary"| CV
 
-    style User fill:#3498db,color:#fff
-    style Code fill:#e74c3c,color:#fff
-    style UV fill:#9b59b6,color:#fff
-    style CV fill:#9b59b6,color:#fff
+    style User fill:#3498db,stroke-width:2px
+    style Code fill:#e74c3c,stroke-width:2px
+    style UV fill:#9b59b6,stroke-width:2px
+    style CV fill:#9b59b6,stroke-width:2px
 ```
 
 The vectors land in different regions because:
+
 - Query uses **natural language** vocabulary
 - Code uses **identifier** vocabulary
 - No semantic bridge connects them
@@ -102,6 +126,7 @@ The insight: embeddings capture meaning better when chunks include explicit cont
 ### Why This Applies to Code
 
 Code has even worse vocabulary mismatch than documents:
+
 - **Identifiers** follow naming conventions, not natural language
 - **Syntax** is structured, not descriptive
 - **Purpose** is implied, not stated
@@ -136,6 +161,7 @@ We evaluated three approaches for adding context:
 **Decision:** Index-time only. Quality matters more than avoiding reindexes.
 
 **Reasoning:**
+
 1. Reindexing is rare (only on code changes)
 2. Query latency is felt on every search
 3. Context quality is better with document-level awareness
@@ -144,11 +170,13 @@ We evaluated three approaches for adding context:
 ### Why Pattern Fallback?
 
 Our core philosophy is "It Just Works" with zero configuration. Pattern-based context ensures the feature works even when:
+
 - Ollama isn't installed
 - LLM endpoint is unavailable
 - User wants faster indexing
 
 Pattern fallback extracts context from:
+
 - **File path:** `internal/search/engine.go` implies search functionality
 - **Symbol names:** `func Search` identifies as a function
 - **Doc comments:** `// Search orchestrates hybrid BM25+vector search`
@@ -174,12 +202,14 @@ We evaluated several models for context generation:
 **Why 0.6b?**
 
 Context generation has different requirements than chat:
+
 1. Short output (1-2 sentences)
 2. Factual extraction, not creativity
 3. Thousands of chunks to process
 4. Latency directly impacts total index time
 
 For 10,000 chunks:
+
 - qwen3:0.6b: ~8 minutes
 - qwen3:1.5b: ~17 minutes
 - llama3.2:1b: ~13 minutes
@@ -202,12 +232,12 @@ flowchart TB
         S2[Scan] --> C2[Chunk] --> CTX[Context<br/>Generation] --> E2[Embed] --> I2[Index]
     end
 
-    CTX -->|"LLM"| LLM[Ollama<br/>qwen3:0.6b]
-    CTX -->|"Fallback"| PAT[Pattern<br/>Extraction]
+    CTX -->|LLM| LLM[Ollama<br/>qwen3:0.6b]
+    CTX -->|Fallback| PAT[Pattern<br/>Extraction]
 
-    style CTX fill:#27ae60,color:#fff
-    style LLM fill:#3498db,color:#fff
-    style PAT fill:#f39c12,color:#fff
+    style CTX fill:#27ae60,stroke-width:2px
+    style LLM fill:#3498db,stroke-width:2px
+    style PAT fill:#f39c12,stroke-width:2px
 ```
 
 ### Context Generation Flow
@@ -262,6 +292,7 @@ Context:
 ```
 
 **Why this prompt works:**
+
 - **File path** gives structural hints
 - **Document context** provides file-level understanding
 - **Specific instructions** prevent verbose output
@@ -269,7 +300,40 @@ Context:
 
 ### Example: Before and After
 
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#3498db','primaryTextColor':'#fff','primaryBorderColor':'#2980b9','lineColor':'#2c3e50','secondaryColor':'#27ae60','tertiaryColor':'#e74c3c','background':'#ecf0f1','mainBkg':'#ecf0f1','secondBkg':'#bdc3c7'}}}%%
+graph TB
+    subgraph Before["❌ Before: Raw Chunk (No Context)"]
+        B1["func (e *Engine) Search(...)"]
+        B2["Query: 'search function'"]
+        B3["❌ No match<br/>Score: 0.42<br/>Below threshold"]
+
+        B2 -.->|"Vocabulary gap"| B3
+        B3 -.->|"Too far apart"| B1
+    end
+
+    subgraph After["✅ After: With Contextual Retrieval"]
+        A1["Context: This file contains the core<br/>search engine for hybrid BM25+vector search.<br/>The Search function is the main entry point..."]
+        A2["func (e *Engine) Search(...)"]
+        A3["Query: 'search function'"]
+        A4["✅ Match!<br/>Score: 0.78<br/>Top result"]
+
+        A3 -->|Context bridges gap| A4
+        A4 -->|Semantic similarity| A1
+        A1 --> A2
+    end
+
+    style B1 fill:#e74c3c,stroke:#c0392b,stroke-width:2px
+    style B2 fill:#f39c12,stroke:#d68910,stroke-width:2px
+    style B3 fill:#e74c3c,stroke:#c0392b,stroke-width:2px
+    style A1 fill:#27ae60,stroke:#229954,stroke-width:2px
+    style A2 fill:#16a085,stroke:#138d75,stroke-width:2px
+    style A3 fill:#3498db,stroke:#2980b9,stroke-width:2px
+    style A4 fill:#27ae60,stroke:#229954,stroke-width:2px
+```
+
 **Before (raw chunk):**
+
 ```go
 func (e *Engine) Search(ctx context.Context, query string) ([]Result, error) {
     bm25Results, _ := e.bm25.Search(query, 20)
@@ -279,6 +343,7 @@ func (e *Engine) Search(ctx context.Context, query string) ([]Result, error) {
 ```
 
 **After (with context):**
+
 ```
 This file contains the core search engine for hybrid BM25+vector search.
 The Search function is the main entry point that orchestrates parallel
@@ -361,11 +426,13 @@ Based on Anthropic's research and our vocabulary mismatch analysis:
 **Our Context:** Code identifiers and natural language queries exist in different vocabulary spaces. Context generation bridges this gap.
 
 **Your Context:** Consider vocabulary bridging when:
+
 - Your content uses domain-specific terminology
 - Users search with natural language
 - Source material is structured/technical
 
 **Techniques:**
+
 - Index-time context generation (our approach)
 - Query expansion at search time
 - Domain-specific embeddings
@@ -374,11 +441,13 @@ Based on Anthropic's research and our vocabulary mismatch analysis:
 ### 2. Index-Time vs Query-Time Trade-offs
 
 **Index-Time Processing** (our choice):
+
 - Higher upfront cost, zero query latency
 - Better for: infrequent updates, latency-sensitive queries
 - Context can use full document awareness
 
 **Query-Time Processing:**
+
 - Lower index cost, higher query latency
 - Better for: frequent updates, latency-tolerant apps
 - Context limited to query understanding
@@ -421,6 +490,7 @@ func GenerateContext(chunk Chunk) string {
 ```
 
 This ensures:
+
 - Best experience when resources available
 - Functional experience when resources limited
 - Never fails completely
@@ -434,6 +504,7 @@ This ensures:
 **Approach:** Expand queries at search time instead of enriching chunks.
 
 **Why rejected:**
+
 - Adds 50-100ms latency per query
 - Query context is limited (no document awareness)
 - Every query pays the cost, not just indexing
@@ -443,6 +514,7 @@ This ensures:
 **Approach:** Use a more capable model (e.g., llama3:8b) for better context.
 
 **Why rejected:**
+
 - 10x slower indexing
 - Diminishing returns for short context generation
 - Our 0.6B model produces good-enough context
@@ -452,6 +524,7 @@ This ensures:
 **Approach:** Train a specialized model for code context generation.
 
 **Why rejected:**
+
 - High upfront investment
 - Maintenance burden
 - Off-the-shelf models work well enough
@@ -463,6 +536,7 @@ This ensures:
 **Why considered:** Models like `nomic-embed-code` understand code better.
 
 **Why we chose both:** They're complementary:
+
 - Better embeddings help with code understanding
 - Context helps with vocabulary bridging
 - Combined effect is multiplicative
@@ -487,8 +561,3 @@ This ensures:
 - [Vector Search Concepts](../concepts/vector-search-concepts.md) - How embeddings capture meaning
 - [Hybrid Search](../concepts/hybrid-search.md) - BM25 + vector fusion
 - [Embedding Models](./embedding-models.md) - Model selection for code search
-
----
-
-**Original Source:** `.aman-pm/decisions/ADR-033` (internal)
-**Last Updated:** 2026-01-16

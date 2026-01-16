@@ -7,6 +7,7 @@
 > **Current Implementation:** See [Architecture](../reference/architecture/architecture.md)
 
 > **Learning Objectives:**
+>
 > - Understand criteria for selecting embedded vector databases
 > - Learn trade-offs between performance and portability
 > - See how requirements drove the eventual pivot to pure Go
@@ -70,18 +71,23 @@ AmanMCP needed to store and search vector embeddings for semantic code search. T
 USearch was chosen in December 2025 for these reasons:
 
 ### 1. Performance
+
 HNSW (Hierarchical Navigable Small World) provides O(log n) search complexity versus O(n) for brute force. For 300K documents, this means millisecond queries instead of seconds.
 
 ### 2. Memory Efficiency
+
 Memory-mapped files allow indexes larger than available RAM. A 100K document index with F16 quantization uses only ~150MB.
 
 ### 3. Built-in Quantization
+
 F16 and I8 quantization reduce memory usage by 2-4x with minimal quality loss.
 
 ### 4. Embeddable Architecture
+
 Single library, no external server process. Users don't need to manage a separate database.
 
 ### 5. Official Go Bindings
+
 ```go
 import "github.com/unum-cloud/usearch/golang"
 
@@ -134,6 +140,24 @@ Developer Experience (Pure Go)
 
 ## Evolution: USearch to coder/hnsw
 
+### Backend Evolution Timeline
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#4dabf7','primaryTextColor':'#212529','primaryBorderColor':'#339af0','lineColor':'#495057','secondaryColor':'#51cf66','tertiaryColor':'#ff6b6b','background':'#f8f9fa','mainBkg':'#ffffff','secondBkg':'#e9ecef','fontSize':'15px','fontFamily':'system-ui, -apple-system, sans-serif','cScale0':'#d0ebff','cScale1':'#a5d8ff','cScale2':'#74c0fc','cScale3':'#4dabf7','cScale4':'#339af0','cScale5':'#1c7ed6','cScale6':'#1864ab'}}}%%
+timeline
+    title Vector Database Evolution Journey
+    section Research Phase
+        Evaluated Options : Considered FAISS, Qdrant, Milvus, chromem-go, USearch : Heavy dependencies or limited scale : Decision - USearch for HNSW + performance
+    section Phase 1 - USearch (Dec 2025)
+        CGO Implementation : ⚡ Sub-10ms queries achieved : F16 quantization + memory-mapped indexes : Native C performance validated
+        Performance Achieved : ✅ 100ms target exceeded : HNSW algorithm working excellently : Quality metrics validated
+        Distribution Pain Discovered : ❌ CGO cross-compilation complexity : 💔 go install workflow broken : User friction unacceptably high
+    section Phase 2 - coder/hnsw (Current)
+        Pure Go Migration : 📊 20-50ms queries (still under target) : Zero CGO dependencies : ✅ Simple distribution restored
+        Trade-off Accepted : 2-5x slower but 10x easier to install : ✨ 30 seconds to working tool : Developer experience prioritized
+        Current State : 🚀 Production ready : ✅ go install fully functional : 📈 User adoption significantly improved
+```
+
 ### Phase 1: USearch (December 2025)
 
 **Goal:** Maximum performance for semantic search
@@ -182,6 +206,7 @@ Both solutions achieved the 100ms target. The differentiator became installation
 - Users are developers who can compile from source
 
 **Examples:**
+
 - High-frequency trading systems
 - Game engines
 - Internal company tools with IT-managed deployment
@@ -196,30 +221,51 @@ Both solutions achieved the 100ms target. The differentiator became installation
 - Users expect frictionless installation
 
 **Examples:**
+
 - Developer CLI tools
 - Open source utilities
 - Tools targeting diverse environments
 
 ### Decision Framework
 
-```
-START
-  │
-  ├─ Is sub-10ms latency critical?
-  │     ├─ YES → Consider CGO (USearch, FAISS)
-  │     └─ NO → Continue
-  │
-  ├─ Is "go install" workflow important?
-  │     ├─ YES → Choose Pure Go (coder/hnsw)
-  │     └─ NO → Continue
-  │
-  ├─ Do you control deployment environment?
-  │     ├─ YES → CGO is acceptable
-  │     └─ NO → Prefer Pure Go
-  │
-  └─ Performance meets targets with pure Go?
-        ├─ YES → Choose Pure Go
-        └─ NO → Choose CGO, accept complexity
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#4dabf7','primaryTextColor':'#212529','primaryBorderColor':'#339af0','lineColor':'#495057','secondaryColor':'#51cf66','tertiaryColor':'#ffd43b','background':'#f8f9fa','mainBkg':'#ffffff','secondBkg':'#e9ecef','fontSize':'14px','fontFamily':'system-ui, -apple-system, sans-serif'}}}%%
+flowchart TD
+    Start["<b>Vector DB Selection</b><br/><i>Choose the right backend</i>"]
+    Latency{"<b>Sub-10ms latency</b><br/>absolutely critical?"}
+    Install{"<b>go install workflow</b><br/>important?"}
+    Control{"<b>Control deployment</b><br/>environment?"}
+
+    CGO1["<b>Consider CGO</b><br/>USearch, FAISS<br/><i>Maximum performance</i>"]
+    PureGo1["<b>✅ Choose Pure Go</b><br/>coder/hnsw<br/><i>Best for CLI tools</i>"]
+    CGO2["<b>CGO acceptable</b><br/>USearch<br/><i>Controlled environment</i>"]
+    PureGo2["<b>Prefer Pure Go</b><br/>coder/hnsw<br/><i>Better portability</i>"]
+
+    Final1["<b>CGO Solution</b><br/>⚡ Higher performance<br/>⚙️ Complex distribution<br/>🔧 Requires C compiler"]
+    Final2["<b>✅ Pure Go Solution</b><br/>📦 Good performance<br/>✨ Simple distribution<br/>🚀 go install works"]
+
+    Start ==> Latency
+    Latency ==>|YES| CGO1
+    Latency ==>|NO| Install
+    Install ==>|YES| PureGo1
+    Install ==>|NO| Control
+    Control ==>|YES| CGO2
+    Control ==>|NO| PureGo2
+    CGO1 ==> Final1
+    PureGo1 ==> Final2
+    CGO2 ==> Final1
+    PureGo2 ==> Final2
+
+    style Start fill:#d0ebff,stroke:#4dabf7,stroke-width:3px,color:#1864ab
+    style Latency fill:#fff3bf,stroke:#ffd43b,stroke-width:2px,color:#f08c00
+    style Install fill:#fff3bf,stroke:#ffd43b,stroke-width:2px,color:#f08c00
+    style Control fill:#fff3bf,stroke:#ffd43b,stroke-width:2px,color:#f08c00
+    style CGO1 fill:#ffffff,stroke:#ff8787,stroke-width:2px,color:#c92a2a
+    style CGO2 fill:#ffffff,stroke:#ff8787,stroke-width:2px,color:#c92a2a
+    style PureGo1 fill:#d3f9d8,stroke:#51cf66,stroke-width:3px,color:#2b8a3e
+    style PureGo2 fill:#d3f9d8,stroke:#51cf66,stroke-width:2px,color:#2b8a3e
+    style Final1 fill:#ffe3e3,stroke:#ff6b6b,stroke-width:3px,color:#c92a2a
+    style Final2 fill:#51cf66,stroke:#40c057,stroke-width:3px,color:#fff
 ```
 
 ---
@@ -263,9 +309,3 @@ The original ADR mentioned chromem-go as a fallback for small codebases. Having 
 - [Architecture](../reference/architecture/architecture.md) - Current system design with coder/hnsw
 - [SQLite vs Bleve](./sqlite-vs-bleve.md) - Similar decision process for BM25 storage
 - [Embedding Models](./embedding-models.md) - Related research on embedding model selection
-
----
-
-**Original Source:** `archive/docs-v1/decisions-superseded/ADR-001-vector-database-usearch.md`
-**Status:** Historical (superseded by coder/hnsw)
-**Last Updated:** 2026-01-16

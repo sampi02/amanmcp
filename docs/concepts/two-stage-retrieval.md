@@ -36,10 +36,14 @@ flowchart LR
         Candidates --> CrossEncoder --> Final
     end
 
-    style Stage1 fill:#3498db,color:#fff
-    style Stage2 fill:#27ae60,color:#fff
-    style BiEncoder fill:#9b59b6,color:#fff
-    style CrossEncoder fill:#e67e22,color:#fff
+    style Stage1 fill:#3498db,stroke-width:2px
+    style Stage2 fill:#27ae60,stroke-width:2px
+    style BiEncoder fill:#9b59b6,stroke-width:2px
+    style CrossEncoder fill:#e67e22,stroke-width:2px
+    style Stage1 color:#ffffff
+    style Stage2 color:#ffffff
+    style BiEncoder color:#ffffff
+    style CrossEncoder color:#ffffff
 ```
 
 ```mermaid
@@ -79,10 +83,14 @@ flowchart TB
 
     Query --> Embed --> VectorSearch --> Candidates
 
-    style Query fill:#3498db,color:#fff
-    style Embed fill:#9b59b6,color:#fff
-    style VectorSearch fill:#e67e22,color:#fff
-    style Candidates fill:#27ae60,color:#fff
+    style Query fill:#3498db,stroke-width:2px
+    style Embed fill:#9b59b6,stroke-width:2px
+    style VectorSearch fill:#e67e22,stroke-width:2px
+    style Candidates fill:#27ae60,stroke-width:2px
+    style Query color:#FFFFFF
+    style Embed color:#FFFFFF
+    style VectorSearch color:#FFFFFF
+    style Candidates color:#FFFFFF
 ```
 
 ---
@@ -122,10 +130,10 @@ flowchart LR
     Input1 --> CE1 --> S1["Score: 0.95"]
     Input2 --> CE2 --> S2["Score: 0.23"]
 
-    style CE1 fill:#27ae60,color:#fff
-    style CE2 fill:#e74c3c,color:#fff
-    style S1 fill:#27ae60,color:#fff
-    style S2 fill:#e74c3c,color:#fff
+    style CE1 fill:#27ae60,stroke-width:2px
+    style CE2 fill:#e74c3c,stroke-width:2px
+    style S1 fill:#27ae60,stroke-width:2px
+    style S2 fill:#e74c3c,stroke-width:2px
 ```
 
 ```mermaid
@@ -165,6 +173,88 @@ Query: "python list append"
 | "Java ArrayList add method" | Medium (similar concept) | Low (wrong language) |
 
 The cross-encoder can see that "python" in the query doesn't match "Java" in the document. The bi-encoder might miss this because both are about "adding to lists."
+
+### Model Architecture Comparison
+
+Understanding the fundamental architectural difference:
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#e1f5ff', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#3498db', 'lineColor': '#3498db', 'secondaryColor': '#c8e6c9', 'tertiaryColor': '#fff4e6'}}}%%
+flowchart TB
+    subgraph BiEncoder["Bi-Encoder Architecture (Embeddings)"]
+        direction TB
+        BQ["Query:<br/>'python list append'"]
+        BD["Document:<br/>'Python lists support append()'"]
+
+        BQEmbed["Encoder 1<br/>(Transformer)"]
+        BDEmbed["Encoder 2<br/>(Same model)"]
+
+        BQVec["Query Vector<br/>[0.12, -0.34, 0.56, ..., 0.11]<br/>768 dimensions"]
+        BDVec["Doc Vector<br/>[0.11, -0.32, 0.58, ..., 0.10]<br/>768 dimensions"]
+
+        BSim["Cosine Similarity<br/>score = 0.89"]
+
+        BQ --> BQEmbed --> BQVec
+        BD --> BDEmbed --> BDVec
+        BQVec --> BSim
+        BDVec --> BSim
+
+        BNote["Key: Encoders are independent<br/>No interaction until similarity calculation"]
+    end
+
+    subgraph CrossEncoder["Cross-Encoder Architecture (Reranker)"]
+        direction TB
+        CConcat["Concatenate with special tokens:<br/>[CLS] python list append [SEP]<br/>Python lists support append() [SEP]<br/>(CLS=classification, SEP=separator)"]
+
+        CTransformer["Single Transformer<br/>with Cross-Attention"]
+
+        CAttention["Full Attention Matrix<br/>'python' attends to 'Python'<br/>'list' attends to 'lists'<br/>'append' attends to 'append()'"]
+
+        CScore["Relevance Score<br/>score = 0.95"]
+
+        CConcat --> CTransformer --> CAttention --> CScore
+
+        CNote["Key: Query and doc tokens<br/>interact through attention<br/>Can see exact word relationships"]
+    end
+
+    style BiEncoder fill:#e1f5ff
+    style CrossEncoder fill:#c8e6c9
+    style BSim fill:#3498db,stroke-width:2px
+    style CScore fill:#27ae60,stroke-width:2px
+    style BNote fill:#ffe0b2
+    style CNote fill:#ffe0b2
+    style CAttention fill:#27ae60,stroke-width:2px
+```
+
+**Why Cross-Encoder is Higher Quality:**
+
+**Bi-Encoder Processing:**
+- `'python'` → vector A
+- `'Python'` → vector B
+- Similarity calculated via embedding space (approximate matching)
+- Encoders process query and document independently
+- No direct interaction between tokens
+
+**Cross-Encoder Processing:**
+- Input format: `[CLS] query [SEP] document [SEP]`
+  - `[CLS]` = Classification token (used for final score)
+  - `[SEP]` = Separator token (marks boundaries)
+- Attention: `'python'` directly attends to `'Python'`
+- Can recognize they're the same word (case-insensitive)
+- Direct token-level comparison (exact matching)
+- Full cross-attention between all query and document tokens
+- Sees complete context of both inputs together
+
+**The Trade-off:**
+
+| Aspect | Bi-Encoder | Cross-Encoder |
+|--------|------------|---------------|
+| Speed | Fast (pre-compute doc vectors) | Slow (process query+doc together) |
+| Scalability | Millions of docs | Tens of docs |
+| Quality | Good (approximate) | Best (exact) |
+| Use case | Retrieval (Stage 1) | Reranking (Stage 2) |
+
+**Solution:** Use both in a two-stage pipeline - bi-encoder for fast retrieval, cross-encoder for quality refinement.
 
 ---
 
@@ -216,7 +306,7 @@ You can't interview 1000 people (too slow), but you also can't hire based on res
 
 ---
 
-## Common Interview Questions
+## Common Questions
 
 1. **Why not just use cross-encoder for everything?**
    - O(n) complexity makes it impossible at scale

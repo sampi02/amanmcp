@@ -1,8 +1,5 @@
 # Go Patterns for AmanMCP
 
-**Version:** 1.0.0
-**Last Updated:** 2025-12-28
-
 Essential Go patterns and idioms used in AmanMCP.
 
 ---
@@ -44,6 +41,41 @@ func LoadConfig(path string) (*Config, error) {
 // Result: "parse config: invalid character..."
 ```
 
+### Error Wrapping Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Caller
+    participant L as LoadConfig
+    participant OS as os.ReadFile
+    participant J as json.Unmarshal
+
+    rect rgb(225, 245, 255)
+    Note over C,J: GOOD: Context preserved at each layer
+    end
+
+    C->>L: LoadConfig("app.json")
+    activate L
+
+    L->>OS: ReadFile("app.json")
+    activate OS
+    OS-->>L: err: "no such file"
+    deactivate OS
+
+    rect rgb(200, 230, 201)
+    Note over L: fmt.Errorf("read config: %w", err)<br/>✓ Adds context<br/>✓ Preserves original error
+    end
+
+    L-->>C: "read config: no such file"
+    deactivate L
+
+    rect rgb(255, 204, 188)
+    Note over C: BAD: return err directly<br/>✗ Loses "where" information<br/>✗ Just "no such file"
+    end
+
+    Note over C: Error chain:<br/>1. os.ReadFile: "no such file"<br/>2. LoadConfig: "read config: %w"<br/>3. Result: "read config: no such file"
+```
+
 ### Sentinel Errors
 
 ```go
@@ -62,6 +94,30 @@ if errors.Is(err, ErrNotFound) {
 ---
 
 ## Interface Design
+
+```mermaid
+graph LR
+    subgraph "Good Practice"
+        A[Function Parameter] -->|Accept Interface| B[Embedder]
+        C[Return Value] -->|Return Concrete| D[*OllamaEmbedder]
+    end
+
+    subgraph "Benefits"
+        B --> E[Testable: Mock easily]
+        B --> F[Flexible: Any implementation]
+        D --> G[Clear: Explicit type]
+        D --> H[Discoverable: IDE helps]
+    end
+
+    style A fill:#e1f5ff
+    style B fill:#c8e6c9
+    style C fill:#e1f5ff
+    style D fill:#c8e6c9
+    style E fill:#c8e6c9
+    style F fill:#c8e6c9
+    style G fill:#c8e6c9
+    style H fill:#c8e6c9
+```
 
 ### Accept Interfaces, Return Structs
 
@@ -103,6 +159,60 @@ type Embedder interface {
     MaxTokens() int
     // ... too many methods
 }
+```
+
+### Interface Design Principles
+
+```mermaid
+classDiagram
+    %% GOOD pattern: Accept interfaces, return structs
+    class SearchEngine {
+        <<concrete struct>>
+        -embedder Embedder
+        -limit int
+        +Search(query string) []Result
+    }
+
+    class Embedder {
+        <<interface>>
+        +Embed(text string) []float32, error
+    }
+
+    class OllamaEmbedder {
+        <<concrete struct>>
+        -url string
+        -model string
+        +Embed(text string) []float32, error
+    }
+
+    class MLXEmbedder {
+        <<concrete struct>>
+        -modelPath string
+        +Embed(text string) []float32, error
+    }
+
+    %% Relationships
+    SearchEngine --> Embedder : accepts interface
+    OllamaEmbedder ..|> Embedder : implements
+    MLXEmbedder ..|> Embedder : implements
+
+    %% Good pattern annotations
+    note for SearchEngine "✓ GOOD: Returns *SearchEngine (struct)<br/>✓ Accepts Embedder (interface)<br/>✓ Easy to mock for testing"
+    note for Embedder "✓ GOOD: Small interface (1 method)<br/>✓ -er suffix convention<br/>✓ Multiple implementations"
+
+    %% Bad pattern example
+    class BadEmbedderFactory {
+        <<anti-pattern>>
+        +NewEmbedder() Embedder
+    }
+
+    note for BadEmbedderFactory "✗ BAD: Returns interface<br/>✗ Hides concrete type<br/>✗ Limits type assertions"
+
+    style SearchEngine fill:#c8e6c9
+    style Embedder fill:#e1f5ff
+    style OllamaEmbedder fill:#c8e6c9
+    style MLXEmbedder fill:#c8e6c9
+    style BadEmbedderFactory fill:#ffccbc
 ```
 
 ---
@@ -234,9 +344,80 @@ func setupTestIndex(t *testing.T) *Index {
 }
 ```
 
+### Testing Pattern Decision Flow
+
+```mermaid
+flowchart TD
+    Start([New Test Needed]) --> Q1{Multiple<br/>similar cases?}
+
+    Q1 -->|Yes| TableDriven[Table-Driven Test]
+    Q1 -->|No| Q2{Need external<br/>dependency?}
+
+    TableDriven --> DefineStruct["Define test struct:<br/>[]struct{name, input, want}"]
+    DefineStruct --> RangeLoop["Range over tests<br/>with t.Run(tt.name)"]
+    RangeLoop --> TableDone[✓ Maintainable]
+
+    Q2 -->|Yes| Q3{Real or mock?}
+    Q2 -->|No| Simple[Simple Test Function]
+
+    Q3 -->|Mock| CreateMock["Create mock struct<br/>with function fields"]
+    Q3 -->|Real| Fixture["Use test fixtures<br/>or temp files"]
+
+    CreateMock --> InjectMock["Inject via interface<br/>parameter"]
+    InjectMock --> MockDone[✓ Fast, isolated]
+
+    Fixture --> Cleanup["defer cleanup<br/>or t.Cleanup()"]
+    Cleanup --> FixtureDone[✓ Integration test]
+
+    Simple --> Helper{Shared<br/>setup?}
+    Helper -->|Yes| HelperFunc["Create helper with<br/>t.Helper()"]
+    Helper -->|No| SimpleDone[✓ Direct test]
+    HelperFunc --> SimpleDone
+
+    style TableDriven fill:#c8e6c9
+    style CreateMock fill:#c8e6c9
+    style Fixture fill:#ffe0b2
+    style HelperFunc fill:#e1f5ff
+    style TableDone fill:#c8e6c9
+    style MockDone fill:#c8e6c9
+    style FixtureDone fill:#ffe0b2
+    style SimpleDone fill:#c8e6c9
+
+    classDef question fill:#e1f5ff,stroke:#3498db
+    class Q1,Q2,Q3,Helper question
+```
+
 ---
 
 ## Concurrency Patterns
+
+```mermaid
+graph TD
+    START[Search Query] --> WG[sync.WaitGroup]
+    WG -->|Add 2| SPLIT{Fork}
+
+    SPLIT -->|goroutine 1| BM25[BM25 Search]
+    SPLIT -->|goroutine 2| VEC[Vector Search]
+
+    BM25 --> DONE1[defer wg.Done]
+    VEC --> DONE2[defer wg.Done]
+
+    DONE1 --> WAIT[wg.Wait]
+    DONE2 --> WAIT
+
+    WAIT --> CHECK{Errors?}
+    CHECK -->|Both failed| ERR[Return error]
+    CHECK -->|One succeeded| FUSE[Fuse Results]
+
+    FUSE --> RESULT[Combined Results]
+
+    style START fill:#e1f5ff
+    style BM25 fill:#c8e6c9
+    style VEC fill:#c8e6c9
+    style WAIT fill:#ffe0b2
+    style RESULT fill:#c8e6c9
+    style ERR fill:#ffccbc
+```
 
 ### WaitGroup for Parallel Work
 
@@ -267,6 +448,57 @@ func (e *Engine) Search(query string) ([]Result, error) {
 
     return e.fuse(bm25Results, vecResults), nil
 }
+```
+
+### WaitGroup Coordination Pattern
+
+```mermaid
+sequenceDiagram
+    participant M as Main Goroutine
+    participant WG as sync.WaitGroup
+    participant G1 as Goroutine 1<br/>(BM25 Search)
+    participant G2 as Goroutine 2<br/>(Vector Search)
+
+    rect rgb(225, 245, 255)
+    Note over M,G2: Parallel search execution
+    end
+
+    M->>WG: wg.Add(2)
+    Note over WG: Counter = 2
+
+    M->>G1: go func() { ... }
+    activate G1
+    M->>G2: go func() { ... }
+    activate G2
+
+    Note over M: wg.Wait()<br/>blocks until counter = 0
+
+    rect rgb(200, 230, 201)
+    Note over G1: bm25Results, bm25Err =<br/>e.bm25.Search(query)
+    end
+
+    rect rgb(200, 230, 201)
+    Note over G2: vecResults, vecErr =<br/>e.vector.Search(query)
+    end
+
+    G1->>WG: defer wg.Done()
+    Note over WG: Counter = 1
+    deactivate G1
+
+    G2->>WG: defer wg.Done()
+    Note over WG: Counter = 0
+    deactivate G2
+
+    WG-->>M: unblocks
+
+    rect rgb(200, 230, 201)
+    Note over M: Both searches complete<br/>✓ Errors captured in vars<br/>✓ Results ready to fuse
+    end
+
+    M->>M: Check errors
+    M->>M: e.fuse(bm25Results, vecResults)
+
+    Note over M: Key points:<br/>1. Add(2) before spawning<br/>2. defer Done() in each goroutine<br/>3. Wait() blocks until all Done()<br/>4. Error handling after Wait()
 ```
 
 ### Mutex for Shared State
@@ -365,6 +597,90 @@ amanmcp/
     └── amanmcp/     # Main entry point
 ```
 
+### Package Dependency Graph
+
+```mermaid
+graph TB
+    subgraph cmd["cmd/ (entry points)"]
+        main[amanmcp/main.go<br/>CLI entry point]
+    end
+
+    subgraph internal["internal/ (private packages)"]
+        config[config/<br/>Config loading]
+        mcp[mcp/<br/>MCP protocol, tools]
+        search[search/<br/>Hybrid search engine]
+        index[index/<br/>Scanner, watcher]
+        chunk[chunk/<br/>Code chunking]
+        embed[embed/<br/>Embedders]
+        store[store/<br/>HNSW, BM25, SQLite]
+    end
+
+    subgraph pkg["pkg/ (public packages)"]
+        version[version/<br/>Version info]
+    end
+
+    subgraph external["External Dependencies"]
+        sitter[tree-sitter<br/>Code parsing]
+        hnsw[coder/hnsw<br/>Vector index]
+        cobra[cobra<br/>CLI framework]
+    end
+
+    %% Entry point dependencies
+    main --> mcp
+    main --> config
+    main --> cobra
+    main --> version
+
+    %% MCP layer dependencies
+    mcp --> search
+    mcp --> index
+
+    %% Search layer dependencies
+    search --> store
+    search --> embed
+
+    %% Index layer dependencies
+    index --> chunk
+    index --> store
+    index --> config
+
+    %% Chunk layer dependencies
+    chunk --> sitter
+
+    %% Embed layer dependencies
+    embed --> config
+
+    %% Store layer dependencies
+    store --> hnsw
+
+    %% Styling
+    style main fill:#c8e6c9
+    style config fill:#e1f5ff
+    style mcp fill:#e1f5ff
+    style search fill:#c8e6c9
+    style index fill:#c8e6c9
+    style chunk fill:#e1f5ff
+    style embed fill:#e1f5ff
+    style store fill:#c8e6c9
+    style version fill:#ffe0b2
+
+    %% Annotations
+    classDef public fill:#ffe0b2,stroke:#f39c12
+    classDef core fill:#c8e6c9,stroke:#27ae60
+    classDef util fill:#e1f5ff,stroke:#3498db
+
+    class version public
+    class search,index,store core
+    class config,mcp,chunk,embed util
+
+    %% Notes
+    note1[✓ No circular dependencies<br/>✓ Clear layer separation<br/>✓ internal/ prevents external use]
+    note1 -.-> internal
+
+    note2[✓ Only version/ is public<br/>✓ Can be imported by other projects]
+    note2 -.-> version
+```
+
 ### Naming Conventions
 
 ```go
@@ -436,6 +752,119 @@ for _, item := range items {
     }(item)
 }
 ```
+
+---
+
+## Code Review Checklist
+
+Use this checklist when reviewing Go code for AmanMCP:
+
+```mermaid
+---
+config:
+  layout: elk
+---
+flowchart LR
+    subgraph Errors["Error Handling"]
+        E1["✓ Wrapped with context<br/>fmt.Errorf('op: %w', err)"]
+        E2["✓ Sentinel errors defined<br/>var ErrNotFound = ..."]
+        E3["✓ errors.Is for checks"]
+    end
+
+    subgraph Resources["Resource Management"]
+        R1["✓ defer for cleanup<br/>defer file.Close()"]
+        R2["✓ tree-sitter closed<br/>defer parser.Close()"]
+        R3["✓ No leaked goroutines"]
+    end
+
+    subgraph Concurrency["Concurrency"]
+        C1["✓ WaitGroup used correctly<br/>Add before spawn"]
+        C2["✓ Mutex for shared state<br/>Lock/Unlock paired"]
+        C3["✓ Context passed through<br/>ctx.Context parameter"]
+        C4["✓ No race conditions<br/>go test -race passes"]
+    end
+
+    subgraph Interfaces["Interfaces"]
+        I1["✓ Accept interfaces<br/>func New(e Embedder)"]
+        I2["✓ Return structs<br/>func New() *Engine"]
+        I3["✓ Small interfaces<br/>1-3 methods ideal"]
+    end
+
+    subgraph Testing["Testing"]
+        T1["✓ Table-driven tests<br/>for multiple cases"]
+        T2["✓ Mocks for interfaces<br/>avoid real dependencies"]
+        T3["✓ t.Helper() in helpers"]
+        T4["✓ Coverage ≥ 25%"]
+    end
+
+    subgraph Naming["Naming & Style"]
+        N1["✓ Package: lowercase<br/>single word"]
+        N2["✓ Files: snake_case.go"]
+        N3["✓ Exported: CamelCase"]
+        N4["✓ Interfaces: -er suffix"]
+    end
+
+    subgraph Common["Common Pitfalls"]
+        P1["✗ Nil map writes"]
+        P2["✗ Variable shadowing"]
+        P3["✗ Range var in closure"]
+    end
+
+    Start([Code Review]) --> Errors
+    Errors --> Resources
+    Resources --> Concurrency
+    Concurrency --> Interfaces
+    Interfaces --> Testing
+    Testing --> Naming
+    Naming --> Common
+    Common --> Done([Approved ✓])
+
+    style E1 fill:#c8e6c9
+    style E2 fill:#c8e6c9
+    style E3 fill:#c8e6c9
+    style R1 fill:#c8e6c9
+    style R2 fill:#c8e6c9
+    style R3 fill:#c8e6c9
+    style C1 fill:#c8e6c9
+    style C2 fill:#c8e6c9
+    style C3 fill:#c8e6c9
+    style C4 fill:#c8e6c9
+    style I1 fill:#c8e6c9
+    style I2 fill:#c8e6c9
+    style I3 fill:#c8e6c9
+    style T1 fill:#c8e6c9
+    style T2 fill:#c8e6c9
+    style T3 fill:#c8e6c9
+    style T4 fill:#c8e6c9
+    style N1 fill:#e1f5ff
+    style N2 fill:#e1f5ff
+    style N3 fill:#e1f5ff
+    style N4 fill:#e1f5ff
+    style P1 fill:#ffccbc
+    style P2 fill:#ffccbc
+    style P3 fill:#ffccbc
+    style Done fill:#c8e6c9
+
+    style Errors fill:#e1f5ff,stroke:#3498db
+    style Resources fill:#e1f5ff,stroke:#3498db
+    style Concurrency fill:#e1f5ff,stroke:#3498db
+    style Interfaces fill:#e1f5ff,stroke:#3498db
+    style Testing fill:#e1f5ff,stroke:#3498db
+    style Naming fill:#e1f5ff,stroke:#3498db
+    style Common fill:#ffe0b2,stroke:#f39c12
+```
+
+**Priority Order:**
+
+1. **HIGH**: Error handling, resource cleanup, concurrency correctness
+2. **MEDIUM**: Interface design, test coverage
+3. **LOW**: Naming style (but still important)
+
+**Fail Fast On:**
+
+- Race conditions (`go test -race` fails)
+- Resource leaks (missing `defer Close()`)
+- Unhandled errors (naked `return err`)
 
 ---
 

@@ -67,7 +67,7 @@ flowchart TB
     Stats <--> Telemetry
     BM25 <--> Meta
 
-    style Engine fill:#e74c3c,color:#fff
+    style Engine fill:#e74c3c,stroke-width:2px
 ```
 
 **1. Testing Difficulty**
@@ -105,8 +105,8 @@ flowchart LR
     Box -.-> I2
     Box -.-> I3
 
-    style Box fill:#3498db,color:#fff
-    style Implementation fill:#ecf0f1,color:#000
+    style Box fill:#3498db,stroke-width:2px
+    style Implementation fill:#ecf0f1,stroke-width:2px
 ```
 
 ### Key Principles We Applied
@@ -135,8 +135,8 @@ flowchart TB
         Change2["Change BM25"] --> Only["Only BM25Indexer"]
     end
 
-    style Before fill:#e74c3c,color:#fff
-    style After fill:#27ae60,color:#fff
+    style Before fill:#e74c3c,stroke-width:2px
+    style After fill:#27ae60,stroke-width:2px
 ```
 
 ---
@@ -386,8 +386,8 @@ flowchart TB
 
     RRF --> Final["Final Ranking:<br/>1. authMiddleware (in both)<br/>2. validateCredentials (in both)<br/>3. checkPassword<br/>4. sessionHandler"]
 
-    style RRF fill:#3498db,color:#fff
-    style Final fill:#27ae60,color:#fff
+    style RRF fill:#3498db,stroke-width:2px
+    style Final fill:#27ae60,stroke-width:2px
 ```
 
 ### Graceful Degradation
@@ -513,8 +513,8 @@ flowchart LR
         Impl --> Plugin["Plug into AmanMCP"]
     end
 
-    style Blocked fill:#e74c3c,color:#fff
-    style Plugin fill:#27ae60,color:#fff
+    style Blocked fill:#e74c3c,stroke-width:2px
+    style Plugin fill:#27ae60,stroke-width:2px
 ```
 
 ---

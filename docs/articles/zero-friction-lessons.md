@@ -43,6 +43,38 @@ Developer tools rarely achieve this standard. AmanMCP tried - and partially succ
 
 A friction analysis maps every point where users encounter resistance. Here's what we found across AmanMCP's user journey.
 
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#e1f5ff', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#0066cc', 'lineColor': '#0066cc', 'secondaryColor': '#ffccbc', 'tertiaryColor': '#fff9c4'}}}%%
+graph TD
+    Start([New User Arrives]) --> Install{Installation}
+    Install -->|CRITICAL| DylibError[Binary crashes:<br/>dylib missing]
+    Install -->|HIGH| CgoFail[go install fails:<br/>CGO required]
+    Install -->|MEDIUM| XcodeFail[Build fails:<br/>no compiler]
+    Install -->|Success| FirstRun{First Run}
+
+    FirstRun -->|MEDIUM| NoIndex[Error: No index found]
+    NoIndex --> ManualIndex[User must run:<br/>amanmcp index]
+    ManualIndex --> Wait[Wait 30s-5min<br/>No progress bar]
+    Wait --> Serve[amanmcp serve]
+
+    FirstRun -->|LOW| NoProgress[No progress indicator]
+    FirstRun -->|LOW| ModelDownload[Surprise:<br/>300MB download]
+
+    Serve --> Daily{Daily Use}
+    Daily -->|MEDIUM| NoUpdate[Outdated version<br/>No check]
+    Daily -->|LOW| WatcherSilent[Changes not reflected<br/>Silent errors]
+
+    style Start fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+    style DylibError fill:#ffccbc,stroke:#e74c3c,stroke-width:3px
+    style CgoFail fill:#ffe0b2,stroke:#f39c12,stroke-width:2px
+    style XcodeFail fill:#ffe0b2,stroke:#f39c12,stroke-width:2px
+    style NoIndex fill:#ffe0b2,stroke:#f39c12,stroke-width:2px
+    style NoProgress fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+    style ModelDownload fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+    style NoUpdate fill:#ffe0b2,stroke:#f39c12,stroke-width:2px
+    style WatcherSilent fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+```
+
 ### Installation Friction
 
 | Friction Point | Severity | User Experience | Root Cause |
@@ -128,34 +160,30 @@ The `AdaptiveEmbedder` pattern in AmanMCP is brilliantly designed and worth stud
 
 ### The Pattern
 
-```
-                              +----------------+
-                              |  User Request  |
-                              +-------+--------+
-                                      |
-                                      v
-                        +-------------+-------------+
-                        |   Check: Model Ready?    |
-                        +-------------+-------------+
-                                      |
-                    +-----------------+-----------------+
-                    |                                   |
-                    v                                   v
-          +--------+--------+               +---------+---------+
-          | YES: Use Model  |               | NO: Use Fallback  |
-          +--------+--------+               +---------+---------+
-                    |                                   |
-                    v                                   v
-            [High Quality]                      [Acceptable]
-                                                      |
-                                                      v
-                                            +--------+--------+
-                                            | Background:     |
-                                            | Download Model  |
-                                            | Retry w/ Backoff|
-                                            | Hot-swap when   |
-                                            | ready           |
-                                            +-----------------+
+```mermaid
+graph TD
+    Request([User Request]) --> Check{Model Ready?}
+
+    Check -->|YES| UseModel[Use ML Model]
+    Check -->|NO| UseFallback[Use Static Fallback]
+
+    UseModel --> HighQuality[High Quality Results]
+    UseFallback --> AcceptableQuality[Acceptable Results]
+
+    UseFallback --> Background[Background Process]
+    Background --> Download[Download Model]
+    Download --> Retry[Retry with Backoff<br/>1s → 2s → 4s → 512s]
+    Retry --> DimCheck{Dimensions<br/>Match?}
+    DimCheck -->|YES| HotSwap[Hot-swap to Model]
+    DimCheck -->|NO| KeepFallback[Keep Using Fallback]
+    HotSwap --> Upgraded[Upgraded Quality]
+
+    style UseModel fill:#4ecdc4
+    style HighQuality fill:#95e1d3
+    style UseFallback fill:#ffe66d
+    style AcceptableQuality fill:#fff9a6
+    style HotSwap fill:#4ecdc4
+    style Upgraded fill:#95e1d3
 ```
 
 ### The Five Properties
@@ -246,6 +274,46 @@ This is a design choice, not a technical limitation. The team prioritized explic
 ---
 
 ## Strategic Recommendations
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#c8e6c9', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#27ae60', 'lineColor': '#27ae60', 'secondaryColor': '#ffe0b2', 'tertiaryColor': '#e1f5ff'}}}%%
+graph TD
+    Start([Friction Identified]) --> Assess{Can we<br/>eliminate it?}
+
+    Assess -->|Yes| Eliminate[Priority 1:<br/>Eliminate Completely]
+    Assess -->|No| Reduce{Can we<br/>reduce it?}
+
+    Reduce -->|Yes| Minimize[Priority 2:<br/>Minimize Impact]
+    Reduce -->|No| Communicate[Priority 3:<br/>Communicate Honestly]
+
+    Eliminate --> E1[Auto-index on first run]
+    Eliminate --> E2[Background downloads]
+    Eliminate --> E3[Graceful degradation]
+
+    Minimize --> M1[Progress indicators]
+    Minimize --> M2[Better error messages]
+    Minimize --> M3[Quick start guides]
+
+    Communicate --> C1[Honest prerequisites]
+    Communicate --> C2[Clear trade-offs]
+    Communicate --> C3[Expected wait times]
+
+    E1 --> Result[Reduced Friction]
+    E2 --> Result
+    E3 --> Result
+    M1 --> Result
+    M2 --> Result
+    M3 --> Result
+    C1 --> Result
+    C2 --> Result
+    C3 --> Result
+
+    style Start fill:#e1f5ff,stroke:#3498db,stroke-width:2px
+    style Eliminate fill:#c8e6c9,stroke:#27ae60,stroke-width:3px
+    style Minimize fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+    style Communicate fill:#ffe0b2,stroke:#f39c12,stroke-width:2px
+    style Result fill:#c8e6c9,stroke:#27ae60,stroke-width:3px
+```
 
 ### Priority 0: Truth in Advertising
 
@@ -340,23 +408,42 @@ Run 'amanmcp update' to upgrade
 
 ### Pattern 1: Adaptive Fallback
 
-```
-+-------------+     +-----------+     +-------------+
-| Try Primary | --> | Success?  | --> | Use Result  |
-+-------------+     +-----------+     +-------------+
-                          |
-                          | No
-                          v
-                    +-----------+     +-------------+
-                    | Fallback  | --> | Use Result  |
-                    +-----------+     +-------------+
-                          |
-                          | Background
-                          v
-                    +-----------+
-                    | Upgrade   |
-                    | Primary   |
-                    +-----------+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#c8e6c9', 'primaryTextColor': '#1a1a1a', 'primaryBorderColor': '#27ae60', 'lineColor': '#27ae60', 'secondaryColor': '#fff9c4', 'tertiaryColor': '#e1f5ff'}}}%%
+sequenceDiagram
+    participant User
+    participant App
+    participant Primary as Primary System
+    participant Fallback as Fallback System
+    participant BG as Background Upgrade
+
+    User->>App: Request Operation
+    App->>Primary: Try Primary
+
+    alt Primary Available
+        Primary-->>App: Success
+        App-->>User: High Quality Result
+    else Primary Unavailable
+        Primary--xApp: Failed
+        App->>Fallback: Use Fallback
+        Fallback-->>App: Success
+        App-->>User: Acceptable Result
+        App->>BG: Start Upgrade (async)
+
+        Note over BG: Downloads/builds<br/>primary system
+
+        BG->>App: Upgrade Complete
+        Note over App: Hot-swap to Primary
+
+        User->>App: Next Request
+        App->>Primary: Use Primary
+        Primary-->>App: Success
+        App-->>User: High Quality Result
+    end
+
+    rect rgb(200, 230, 201)
+        Note over User,Fallback: User never waits - immediate results
+    end
 ```
 
 **Implementation:**
@@ -477,6 +564,44 @@ This is a common pattern in developer tools. The core functionality is excellent
 | Edge cases | "Is this production-ready?" | Often neglected |
 
 The 10% that's neglected is often 90% of what users experience in their first hour.
+
+### Developer Journey Comparison
+
+```mermaid
+graph LR
+    subgraph Traditional["❌ Traditional Setup Journey"]
+        T1[Read Docs] --> T2[Install Dependencies]
+        T2 --> T3[Install Tool]
+        T3 --> T4{Build Success?}
+        T4 -->|No| T5[Debug Build Errors]
+        T5 --> T6[Search StackOverflow]
+        T6 --> T2
+        T4 -->|Yes| T7[Create Config File]
+        T7 --> T8[Run Setup Command]
+        T8 --> T9{Works?}
+        T9 -->|No| T10[Debug Runtime Errors]
+        T10 --> T7
+        T9 -->|Yes| T11[Start Using]
+        T11:::success
+    end
+
+    subgraph ZeroFriction["✅ Zero-Friction Journey"]
+        Z1[Install via Package Manager] --> Z2[Run Single Command]
+        Z2 --> Z3[Auto-detect Project]
+        Z3 --> Z4[Auto-configure Defaults]
+        Z4 --> Z5[Auto-index in Background]
+        Z5 --> Z6[Start Using]
+        Z6:::success
+    end
+
+    style Traditional fill:#ffe0e0
+    style ZeroFriction fill:#e0ffe0
+    classDef success fill:#95e1d3,stroke:#4ecdc4,stroke-width:3px
+```
+
+**Time-to-Value:**
+- Traditional: 15-60 minutes (with potential failures)
+- Zero-Friction: 30-60 seconds (guaranteed success)
 
 ---
 

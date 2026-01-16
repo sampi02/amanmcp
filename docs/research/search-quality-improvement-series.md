@@ -1,11 +1,13 @@
 # Search Quality Improvement Series: Bridging the Vocabulary Gap
 
 > **Learning Objectives:**
+>
 > - Understand the full picture of vocabulary mismatch solutions
 > - Learn when to use index-time vs query-time approaches
 > - Apply different strategies for BM25 vs vector search
 >
 > **Prerequisites:**
+>
 > - [Hybrid Search Concepts](../concepts/hybrid-search.md)
 > - Basic understanding of BM25 and vector search
 >
@@ -83,27 +85,22 @@ Code has worse vocabulary mismatch than documents for three reasons:
 
 ### Visualizing the Gap
 
-```
-                    EMBEDDING SPACE
-    +--------------------------------------------+
-    |                                            |
-    |   User Query                               |
-    |   "error handling retry backoff"           |
-    |              *                             |
-    |               \                            |
-    |                \  Vocabulary               |
-    |                 \ Gap                      |
-    |                  \                         |
-    |                   \                        |
-    |                    * Code Chunks           |
-    |                    "func Retry(...)"       |
-    |                    "RetryConfig"           |
-    |                    "MaxRetries"            |
-    |                                            |
-    +--------------------------------------------+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#667eea','primaryTextColor':'#fff','primaryBorderColor':'#5568d3','lineColor':'#4a5568','fontFamily':'system-ui, -apple-system, sans-serif'}}}%%
+graph TB
+    subgraph space["<b>EMBEDDING SPACE</b><br/>(Semantic Distance = Retrieval Quality)"]
+        query["<b>👤 User Query</b><br/><i>error handling retry backoff</i><br/><br/>Natural language concepts"]
+        code["<b>💻 Code Chunks</b><br/><i>func Retry(...)<br/>RetryConfig<br/>MaxRetries</i><br/><br/>Technical identifiers"]
+
+        query -.->|"<b>VOCABULARY GAP</b><br/>Too distant in<br/>embedding space<br/>❌ Below threshold"| code
+    end
+
+    style space fill:#faf5ff,stroke:#9f7aea,stroke-width:2px,color:#2d3748
+    style query fill:#667eea,stroke:#5568d3,stroke-width:3px,color:#fff
+    style code fill:#fc8181,stroke:#f56565,stroke-width:3px,color:#fff
 ```
 
-The query and code land in different regions of embedding space. The similarity score falls below the retrieval threshold.
+**Problem:** The query and code land in different regions of embedding space. The similarity score falls below the retrieval threshold.
 
 ---
 
@@ -116,6 +113,7 @@ Prepend LLM-generated context to each chunk **before embedding**. This bridges t
 ### Before and After
 
 **Before (raw chunk):**
+
 ```go
 func (e *Engine) Search(ctx context.Context, query string) ([]Result, error) {
     bm25Results, _ := e.bm25.Search(query, 20)
@@ -125,6 +123,7 @@ func (e *Engine) Search(ctx context.Context, query string) ([]Result, error) {
 ```
 
 **After (with context):**
+
 ```
 This file contains the core search engine for hybrid BM25+vector search.
 The Search function is the main entry point that orchestrates parallel
@@ -145,14 +144,35 @@ Vector search (embeddings) captures **semantic meaning**. The embedding model un
 
 By adding context that describes purpose in natural language, we give the embedding model explicit signal about what the code does. This bridges the vocabulary gap at index time.
 
-```
-Before embedding:                    After embedding:
-"func Search(...)"                   "main entry point for hybrid search"
-         |                                        |
-         v                                        v
-[0.12, -0.34, ...]                   [0.11, -0.32, ...]
-         |                                        |
-         x--- far from "search function" query    +--- close to "search function" query
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#667eea','primaryTextColor':'#fff','primaryBorderColor':'#5568d3','lineColor':'#4a5568','fontFamily':'system-ui, -apple-system, sans-serif'}}}%%
+graph LR
+    subgraph before["<b>❌ BEFORE: Raw Chunk</b>"]
+        B1["<i>func Search(...)</i>"]
+        B2["Embedding:<br/>[0.12, -0.34, ...]"]
+        B3["<b>Result</b><br/>❌ Far from query<br/><i>search function</i>"]
+
+        B1 --> B2 --> B3
+    end
+
+    subgraph after["<b>✅ AFTER: With Context</b>"]
+        A1["<i>main entry point<br/>for hybrid search<br/><br/>func Search(...)</i>"]
+        A2["Embedding:<br/>[0.11, -0.32, ...]"]
+        A3["<b>Result</b><br/>✅ Close to query<br/><i>search function</i>"]
+
+        A1 --> A2 --> A3
+    end
+
+    style before fill:#fff5f5,stroke:#fc8181,stroke-width:2px,color:#2d3748
+    style after fill:#f0fff4,stroke:#48bb78,stroke-width:2px,color:#2d3748
+
+    style B1 fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style B2 fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style B3 fill:#fc8181,stroke:#f56565,stroke-width:2px,color:#fff
+
+    style A1 fill:#d4f4dd,stroke:#48bb78,stroke-width:2px,color:#2d3748
+    style A2 fill:#d4f4dd,stroke:#48bb78,stroke-width:2px,color:#2d3748
+    style A3 fill:#48bb78,stroke:#38a169,stroke-width:2px,color:#fff
 ```
 
 ### Implementation Summary
@@ -166,17 +186,39 @@ Before embedding:                    After embedding:
 
 ### Architecture
 
-```
-Previous Pipeline:
-    Scan --> Chunk --> Embed --> Index
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#667eea','primaryTextColor':'#fff','primaryBorderColor':'#5568d3','lineColor':'#4a5568','fontFamily':'system-ui, -apple-system, sans-serif'}}}%%
+graph LR
+    subgraph previous["<b>Previous Pipeline</b>"]
+        direction LR
+        P1[Scan] --> P2[Chunk] --> P3[Embed] --> P4[Index]
+    end
 
-Enhanced Pipeline:
-    Scan --> Chunk --> [Context Generation] --> Embed --> Index
-                              |
-                    +--------------------+
-                    |                    |
-                 LLM Context       Pattern Fallback
-              (Ollama qwen3:0.6b)  (file path + symbols)
+    subgraph enhanced["<b>✨ Enhanced Pipeline</b>"]
+        direction LR
+        E1[Scan] --> E2[Chunk] --> E3["<b>Context<br/>Generation</b>"]
+        E3 --> E4[Embed] --> E5[Index]
+
+        E3 -.->|Primary| LLM["<b>LLM Context</b><br/>Ollama qwen3:0.6b<br/>Best quality"]
+        E3 -.->|Fallback| Pattern["<b>Pattern Context</b><br/>File path + symbols<br/>Zero-config"]
+    end
+
+    style previous fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style enhanced fill:#f0fff4,stroke:#48bb78,stroke-width:2px,color:#2d3748
+
+    style P1 fill:#cbd5e0,stroke:#a0aec0,stroke-width:2px,color:#2d3748
+    style P2 fill:#cbd5e0,stroke:#a0aec0,stroke-width:2px,color:#2d3748
+    style P3 fill:#cbd5e0,stroke:#a0aec0,stroke-width:2px,color:#2d3748
+    style P4 fill:#cbd5e0,stroke:#a0aec0,stroke-width:2px,color:#2d3748
+
+    style E1 fill:#d4f4dd,stroke:#48bb78,stroke-width:2px,color:#2d3748
+    style E2 fill:#d4f4dd,stroke:#48bb78,stroke-width:2px,color:#2d3748
+    style E3 fill:#667eea,stroke:#5568d3,stroke-width:3px,color:#fff
+    style E4 fill:#d4f4dd,stroke:#48bb78,stroke-width:2px,color:#2d3748
+    style E5 fill:#d4f4dd,stroke:#48bb78,stroke-width:2px,color:#2d3748
+
+    style LLM fill:#9f7aea,stroke:#805ad5,stroke-width:2px,color:#fff
+    style Pattern fill:#4299e1,stroke:#3182ce,stroke-width:2px,color:#fff
 ```
 
 ### Why Index-Time?
@@ -210,11 +252,13 @@ Add synonyms and case variants to BM25 queries at search time. This bridges voca
 ### Before and After
 
 **Original query:**
+
 ```
 "search function"
 ```
 
 **Expanded query (for BM25):**
+
 ```
 "search Search find query lookup function func fn method Engine"
 ```
@@ -240,6 +284,7 @@ Document B: "// search function for the API..."
 ```
 
 Query expansion fixes this by adding variants:
+
 - `search` + `Search` (case variant)
 - `function` + `func` + `fn` + `method` (synonyms)
 
@@ -271,24 +316,38 @@ Expanded query:    "Search function func fn search query lookup Engine"
 
 The expanded embedding is a blend of all concepts, making it less precise:
 
-```
-                    EMBEDDING SPACE
-    +--------------------------------------------+
-    |                                            |
-    |    "query"  *                              |
-    |              \                             |
-    |               *  "search"                  |
-    |              / \                           |
-    | Expanded    /   * <-- Original query       |
-    | query --> *       ("Search function")      |
-    |           / \                              |
-    |   "func" *   * "Engine"                    |
-    |                                            |
-    |    "method" *                              |
-    +--------------------------------------------+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#667eea','primaryTextColor':'#fff','primaryBorderColor':'#5568d3','lineColor':'#4a5568','fontFamily':'system-ui, -apple-system, sans-serif'}}}%%
+graph TB
+    subgraph space["<b>EMBEDDING SPACE</b><br/>(semantic similarity = proximity)"]
+        orig["<b>🎯 Original Query</b><br/><i>Search function</i><br/><br/>Precise targeting"]
+        expand["<b>🌐 Expanded Query</b><br/><i>search + find + query<br/>+ func + Engine + method</i><br/><br/>Diluted, imprecise"]
+
+        search["<b>search</b>"]
+        func["<b>func</b>"]
+        query["<b>query</b>"]
+        engine["<b>Engine</b>"]
+        method["<b>method</b>"]
+
+        orig -.->|close| search
+        orig -.->|close| func
+
+        expand -.->|moderate| query
+        expand -.->|moderate| engine
+        expand -.->|distant| method
+    end
+
+    style space fill:#faf5ff,stroke:#9f7aea,stroke-width:2px,color:#2d3748
+    style orig fill:#48bb78,stroke:#38a169,stroke-width:3px,color:#fff
+    style expand fill:#fc8181,stroke:#f56565,stroke-width:3px,color:#fff
+    style search fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style func fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style query fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style engine fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style method fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
 ```
 
-The original query lands precisely. The expanded query lands in the middle of multiple concepts---less precise, worse results.
+**Key insight:** The original query (🎯) lands precisely. The expanded query (🌐) lands in the middle of multiple concepts—less precise, worse results.
 
 ### Our Synonym Mappings
 
@@ -324,34 +383,40 @@ Each mapping targets a specific mismatch:
 
 ### The Combined Architecture
 
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#667eea','primaryTextColor':'#fff','primaryBorderColor':'#5568d3','lineColor':'#4a5568','fontFamily':'system-ui, -apple-system, sans-serif'}}}%%
+flowchart TD
+    A["<b>User Query</b><br/><i>search function</i>"] --> B["<b>BM25 Path</b>"]
+    A --> C["<b>Vector Path</b>"]
+
+    B --> D["<b>Expand Query</b>"]
+    D --> E["<i>search Search find<br/>query lookup function<br/>func fn method Engine</i>"]
+    E --> F["<b>BM25 Search</b>"]
+
+    C --> G["<b>Keep Original</b>"]
+    G --> H["<i>search function</i>"]
+    H --> I["<b>Embed Query</b>"]
+    I --> J["<b>Vector Search</b><br/>against context-enriched chunks"]
+
+    F --> K["<b>RRF Fusion</b><br/>BM25 weight: 0.35<br/>Vector weight: 0.65"]
+    J --> K
+    K --> L["<b>Final Results</b>"]
+
+    style A fill:#667eea,stroke:#5568d3,stroke-width:3px,color:#fff
+    style B fill:#f6ad55,stroke:#ed8936,stroke-width:2px,color:#fff
+    style C fill:#f6ad55,stroke:#ed8936,stroke-width:2px,color:#fff
+    style D fill:#48bb78,stroke:#38a169,stroke-width:3px,color:#fff
+    style E fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style F fill:#9f7aea,stroke:#805ad5,stroke-width:2px,color:#fff
+    style G fill:#4299e1,stroke:#3182ce,stroke-width:3px,color:#fff
+    style H fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style I fill:#4299e1,stroke:#3182ce,stroke-width:2px,color:#fff
+    style J fill:#9f7aea,stroke:#805ad5,stroke-width:2px,color:#fff
+    style K fill:#fc8181,stroke:#f56565,stroke-width:3px,color:#fff
+    style L fill:#48bb78,stroke:#38a169,stroke-width:3px,color:#fff
 ```
-User Query: "search function"
-         |
-         +---------------------------+
-         |                           |
-         v                           v
-    BM25 Path                   Vector Path
-         |                           |
-    [Expand Query]              [Keep Original]
-         |                           |
-         v                           v
-"search Search find             "search function"
- query lookup function               |
- func fn method Engine"              v
-         |                      [Embed Query]
-         v                           |
-    [BM25 Search]                    v
-         |                   [Vector Search against
-         |                    context-enriched chunks]
-         |                           |
-         +----------+    +-----------+
-                    |    |
-                    v    v
-               [RRF Fusion]
-                    |
-                    v
-              Final Results
-```
+
+**Key Insight:** BM25 gets expanded query, Vector gets original query against enriched chunks.
 
 ### The Complementary Nature
 
@@ -417,6 +482,22 @@ Key insight: **BM25 gets expanded query, Vector gets original query against enri
 | + Query Expansion (BM25-only) | 80% | +5% | Asymmetric expansion |
 | + Tuned synonyms | 92% | +12% | Domain-specific mappings |
 
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'xyChart': { 'backgroundColor': 'transparent', 'titleColor': '#2d3748', 'xAxisLabelColor': '#4a5568', 'yAxisLabelColor': '#4a5568', 'plotColorPalette': '#667eea, #48bb78, #f6ad55, #fc8181' }}}}%%
+xychart-beta
+    title "Search Quality Journey: 60% → 92%"
+    x-axis ["Baseline", "CR Added", "QE Added", "Tuned Synonyms"]
+    y-axis "Pass Rate (%)" 0 --> 100
+    line [60, 75, 80, 92]
+```
+
+**Key Milestones:**
+
+- Baseline (60%): Raw hybrid search
+- +CR (75%): Contextual retrieval improves embeddings
+- +QE (80%): Query expansion helps BM25
+- +Tuned (92%): Domain-specific synonym mappings
+
 ### Per-Query Type Improvement
 
 | Query Type | Before | After | Improvement |
@@ -424,6 +505,18 @@ Key insight: **BM25 gets expanded query, Vector gets original query against enri
 | Exact identifiers | 100% | 100% | Maintained |
 | Mixed natural+code | 75% | 95% | +20% |
 | Pure natural language | 0% | 85% | +85% |
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'xyChart': { 'backgroundColor': 'transparent', 'titleColor': '#2d3748', 'xAxisLabelColor': '#4a5568', 'yAxisLabelColor': '#4a5568', 'plotColorPalette': '#fc8181, #48bb78' }}}}%%
+xychart-beta
+    title "Per-Query Type Improvement"
+    x-axis ["Exact Identifiers", "Mixed Natural+Code", "Pure Natural Language"]
+    y-axis "Pass Rate (%)" 0 --> 100
+    bar [100, 75, 0]
+    bar [100, 95, 85]
+```
+
+**Legend:** Red = Before, Green = After
 
 ### Per-Backend Analysis
 
@@ -455,12 +548,14 @@ BM25 and vector search have fundamentally different properties:
 ### Lesson 2: Index-Time vs Query-Time Trade-offs
 
 **Index-time processing (Contextual Retrieval):**
+
 - Pay cost once during indexing
 - Zero impact on query latency
 - Can use full document context
 - Requires reindex when approach changes
 
 **Query-time processing (Query Expansion):**
+
 - Pay cost on every query
 - Adds latency (though minimal if cached)
 - Limited to query understanding
@@ -506,6 +601,7 @@ Test 2: Per-backend metrics
 **For vector search:** Embedding models have already learned semantic relationships. Do not over-engineer query preprocessing.
 
 **Anti-patterns:**
+
 - Adding synonyms to vector queries (dilutes embeddings)
 - Aggressive stemming (loses precision)
 - Query expansion for embeddings (we proved this hurts)
@@ -533,6 +629,7 @@ Build your synonym mappings from actual user queries and actual code vocabulary.
 3. **Raw chunk** (baseline, always works)
 
 This ensures:
+
 - Best experience when resources available
 - Functional experience when resources limited
 - Never fails completely
@@ -541,32 +638,28 @@ This ensures:
 
 ## Decision Tree: Which Solution to Apply
 
-```
-                    Vocabulary Mismatch Problem
-                              |
-                              v
-              +--------------------------------+
-              |  Which search backend?          |
-              +--------------------------------+
-                    |                 |
-               BM25 |                 | Vector
-                    v                 v
-        +---------------+      +----------------+
-        | Query-time    |      | Index-time     |
-        | Expansion     |      | Enrichment     |
-        | - Add synonyms|      | - Add context  |
-        | - Case variant|      | - Describe     |
-        | - Domain terms|      |   purpose      |
-        +---------------+      +----------------+
-                    |                 |
-                    +--------+--------+
-                             |
-                             v
-                    +----------------+
-                    | Apply together |
-                    | in hybrid      |
-                    | search         |
-                    +----------------+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#667eea','primaryTextColor':'#fff','primaryBorderColor':'#5568d3','lineColor':'#4a5568','fontFamily':'system-ui, -apple-system, sans-serif'}}}%%
+flowchart TD
+    Problem["<b>⚠️ Vocabulary Mismatch Problem</b><br/>Users use natural language<br/>Code uses technical identifiers"]
+
+    Problem --> Decision{<b>Which Search<br/>Backend?</b>}
+
+    Decision -->|"<b>BM25</b><br/>(Keyword)"| BM25["<b>Query-Time Expansion</b><br/><br/>• Add synonyms<br/>• Add case variants<br/>• Add domain terms<br/><br/>Example: function → func, fn, method"]
+
+    Decision -->|"<b>Vector</b><br/>(Semantic)"| Vector["<b>Index-Time Enrichment</b><br/><br/>• Add context<br/>• Describe purpose<br/>• Bridge vocabulary<br/><br/>Example: Prepend 'main entry point for...'"]
+
+    BM25 --> Together["<b>✨ Apply Together</b><br/>in Hybrid Search<br/><br/>BM25: Expanded query<br/>Vector: Original query + enriched chunks<br/>Fusion: RRF (k=60)"]
+    Vector --> Together
+
+    Together --> Results["<b>🎯 Results</b><br/>60% → 92% pass rate<br/>Natural language queries work"]
+
+    style Problem fill:#fc8181,stroke:#f56565,stroke-width:3px,color:#fff
+    style Decision fill:#f6ad55,stroke:#ed8936,stroke-width:3px,color:#fff
+    style BM25 fill:#48bb78,stroke:#38a169,stroke-width:3px,color:#fff
+    style Vector fill:#4299e1,stroke:#3182ce,stroke-width:3px,color:#fff
+    style Together fill:#9f7aea,stroke:#805ad5,stroke-width:3px,color:#fff
+    style Results fill:#48bb78,stroke:#38a169,stroke-width:3px,color:#fff
 ```
 
 ---
@@ -648,8 +741,3 @@ Vocabulary mismatch is the primary failure mode for code search. Users think in 
 **Key insight:** Different backends need different preprocessing. What helps BM25 (expansion) hurts vectors (dilution). Apply solutions asymmetrically.
 
 **Results:** Pass rate improved from 60% to 92%. Pure natural language queries went from 0% to 85%.
-
----
-
-**Synthesized from:** ADR-033 (Contextual Retrieval) + ADR-034 (Query Expansion)
-**Last Updated:** 2026-01-16

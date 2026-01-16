@@ -9,6 +9,10 @@
 Static embeddings are a **hash-based approach** to generating vector representations of text that requires **no external dependencies** - no GPU, no network, no model downloads. They exist in AmanMCP as an explicit opt-in mode (`--backend=static`) for users who want BM25-only search or cannot run Ollama.
 
 ```mermaid
+---
+config:
+  layout: elk
+---
 flowchart LR
     subgraph Static["Static Embeddings"]
         S1[Text] --> S2[Hash Function]
@@ -26,12 +30,13 @@ flowchart LR
     Compare --> |"~35%"| Static
     Compare --> |"100%"| Neural
 
-    style S2 fill:#f39c12,color:#fff
-    style N2 fill:#9b59b6,color:#fff
-    style Compare fill:#3498db,color:#fff
+    style S2 fill:#f39c12,stroke-width:2px
+    style N2 fill:#9b59b6,stroke-width:2px
+    style Compare fill:#3498db,stroke-width:2px
 ```
 
 **Key characteristics:**
+
 - Speed: ~1,000 embeddings/second (vs ~30/second for neural models)
 - Quality: ~30-40% of neural embedding quality for semantic similarity
 - Dependencies: Zero (pure computation)
@@ -44,6 +49,7 @@ flowchart LR
 ### The Core Concept
 
 Traditional neural embeddings use trained transformer models (like Qwen3 or EmbeddingGemma) to convert text into vectors that capture semantic meaning. This requires:
+
 - A model file (hundreds of MB to GB)
 - An inference runtime (Ollama, MLX, etc.)
 - Compute resources (GPU preferred)
@@ -51,6 +57,10 @@ Traditional neural embeddings use trained transformer models (like Qwen3 or Embe
 Static embeddings take a radically different approach: they use **deterministic hash functions** to map text features directly to vector dimensions. No learning, no models, no dependencies.
 
 ```mermaid
+---
+config:
+  layout: elk
+---
 flowchart TB
     subgraph Neural["Neural Embedding Pipeline"]
         direction LR
@@ -66,10 +76,10 @@ flowchart TB
         Hash --> V2["[0.0, 0.7, 0.0, 0.3, ...]<br/><i>lexical features</i>"]
     end
 
-    style TF fill:#9b59b6,color:#fff
-    style Hash fill:#e67e22,color:#fff
-    style V1 fill:#27ae60,color:#fff
-    style V2 fill:#f39c12,color:#fff
+    style TF fill:#9b59b6,stroke-width:2px
+    style Hash fill:#e67e22,stroke-width:2px
+    style V1 fill:#27ae60,stroke-width:2px
+    style V2 fill:#f39c12,stroke-width:2px
 ```
 
 ### Why "Static"?
@@ -89,7 +99,7 @@ flowchart LR
     Static2 --> Output
     Static3 --> Output
 
-    style Output fill:#27ae60,color:#fff
+    style Output fill:#27ae60,stroke-width:2px
 ```
 
 ---
@@ -101,6 +111,10 @@ flowchart LR
 AmanMCP's `StaticEmbedder768` uses a four-step process:
 
 ```mermaid
+---
+config:
+  layout: elk
+---
 flowchart TB
     Input["Input Text<br/><code>func getUserById(id string)</code>"] --> Step1
 
@@ -139,9 +153,9 @@ flowchart TB
 
     Step4 --> Output["768-dim unit vector"]
 
-    style Input fill:#3498db,color:#fff
-    style Output fill:#27ae60,color:#fff
-    style Tokens fill:#f39c12,color:#000
+    style Input fill:#3498db,stroke-width:2px
+    style Output fill:#27ae60,stroke-width:2px
+    style Tokens fill:#f39c12,stroke-width:2px
 ```
 
 ### Step 1: Code-Aware Tokenization
@@ -160,10 +174,10 @@ flowchart LR
         SC2 --> SC3["max, buffer, size"]
     end
 
-    style CC1 fill:#3498db,color:#fff
-    style SC1 fill:#9b59b6,color:#fff
-    style CC3 fill:#27ae60,color:#fff
-    style SC3 fill:#27ae60,color:#fff
+    style CC1 fill:#3498db,stroke-width:2px
+    style SC1 fill:#9b59b6,stroke-width:2px
+    style CC3 fill:#27ae60,stroke-width:2px
+    style SC3 fill:#27ae60,stroke-width:2px
 ```
 
 This is critical for code search. Without this, `getUserById` would be treated as a single opaque token, missing the semantic connection to queries like "get user by id".
@@ -181,9 +195,9 @@ flowchart LR
     Filter -->|Removed| Trash["🗑️"]
     Filter -->|Kept| Output["calculate, process,<br/>validate, user, data"]
 
-    style Input fill:#e74c3c,color:#fff
-    style Trash fill:#7f8c8d,color:#fff
-    style Output fill:#27ae60,color:#fff
+    style Input fill:#e74c3c,stroke-width:2px
+    style Trash fill:#7f8c8d,stroke-width:2px
+    style Output fill:#27ae60,stroke-width:2px
 ```
 
 Why? These words appear in virtually every code file. Including them would make all code look similar.
@@ -207,9 +221,9 @@ flowchart TB
 
     Index --> V342
 
-    style Token fill:#3498db,color:#fff
-    style Index fill:#e67e22,color:#fff
-    style V342 fill:#27ae60,color:#fff
+    style Token fill:#3498db,stroke-width:2px
+    style Index fill:#e67e22,stroke-width:2px
+    style V342 fill:#27ae60,stroke-width:2px
 ```
 
 The weight (0.7) reflects that whole tokens carry more semantic signal than substrings.
@@ -235,11 +249,12 @@ flowchart LR
     NGrams --> Hash["Hash each<br/>to index"]
     Hash --> Vector["Add 0.3<br/>per n-gram"]
 
-    style Word fill:#3498db,color:#fff
-    style Vector fill:#27ae60,color:#fff
+    style Word fill:#3498db,stroke-width:2px
+    style Vector fill:#27ae60,stroke-width:2px
 ```
 
 N-grams help with:
+
 - Typo tolerance ("authen" vs "authan")
 - Partial matches ("auth" matching "authentication")
 - Morphological similarity ("authenticate", "authentication", "authenticator")
@@ -255,8 +270,8 @@ flowchart LR
     Sqrt --> Divide["x / magnitude"]
     Divide --> Unit["[0, 0.58, 0, 0.25, 0.58, ...]<br/>|v| = 1.0"]
 
-    style Raw fill:#e74c3c,color:#fff
-    style Unit fill:#27ae60,color:#fff
+    style Raw fill:#e74c3c,stroke-width:2px
+    style Unit fill:#27ae60,stroke-width:2px
 ```
 
 Normalization ensures cosine similarity works correctly (comparing angles, not magnitudes).
@@ -309,9 +324,9 @@ flowchart TB
 
     Options -->|--backend=static| Static["Use Static768<br/>⚠️ BM25 only"]
 
-    style Neural fill:#27ae60,color:#fff
-    style Error fill:#e74c3c,color:#fff
-    style Static fill:#f39c12,color:#fff
+    style Neural fill:#27ae60,stroke-width:2px
+    style Error fill:#e74c3c,stroke-width:2px
+    style Static fill:#f39c12,stroke-width:2px
 ```
 
 After BUG-073, static embeddings are **explicitly opt-in only**.
@@ -327,6 +342,10 @@ Before comparing static embeddings to neural models, let's understand what makes
 Qwen3-Embedding-0.6B is a **600 million parameter transformer model** specifically designed for generating text embeddings. It's part of Alibaba's Qwen3 family, optimized for code and documentation search.
 
 ```mermaid
+---
+config:
+  layout: elk
+---
 flowchart TB
     subgraph Qwen3["Qwen3-Embedding-0.6B"]
         direction TB
@@ -345,8 +364,8 @@ flowchart TB
         S4["GPT-3: 175B"]
     end
 
-    style Qwen3 fill:#9b59b6,color:#fff
-    style S2 fill:#27ae60,color:#fff
+    style Qwen3 fill:#9b59b6,stroke-width:2px
+    style S2 fill:#27ae60,stroke-width:2px
 ```
 
 | Specification | Value |
@@ -379,13 +398,13 @@ flowchart LR
         R5["= Available: ~8GB"]
     end
 
-    M1 -->|"✅ Fits"| R5
-    M2 -->|"⚠️ Tight"| R5
-    M3 -->|"❌ System freeze"| R5
+    M1 -->|✅ Fits| R5
+    M2 -->|⚠️ Tight| R5
+    M3 -->|❌ System freeze| R5
 
-    style M1 fill:#27ae60,color:#fff
-    style M2 fill:#f39c12,color:#fff
-    style M3 fill:#e74c3c,color:#fff
+    style M1 fill:#27ae60,stroke-width:2px
+    style M2 fill:#f39c12,stroke-width:2px
+    style M3 fill:#e74c3c,stroke-width:2px
 ```
 
 The 8B model causes system freezes on 24GB machines when other applications are running. The 0.6B variant provides excellent quality while remaining practical.
@@ -399,6 +418,10 @@ The 8B model causes system freezes on 24GB machines when other applications are 
 Unlike static embeddings (hash function), Qwen3 uses a deep neural network with **attention mechanisms** that understand relationships between words:
 
 ```mermaid
+---
+config:
+  layout: elk
+---
 flowchart TB
     subgraph Input["Input Processing"]
         Text["'validate user credentials'"]
@@ -422,10 +445,10 @@ flowchart TB
         Pool --> Vector["768-dim vector"]
     end
 
-    style Tokenizer fill:#3498db,color:#fff
-    style Attn1 fill:#9b59b6,color:#fff
-    style Attn2 fill:#9b59b6,color:#fff
-    style Vector fill:#27ae60,color:#fff
+    style Tokenizer fill:#3498db,stroke-width:2px
+    style Attn1 fill:#9b59b6,stroke-width:2px
+    style Attn2 fill:#9b59b6,stroke-width:2px
+    style Vector fill:#27ae60,stroke-width:2px
 ```
 
 ### The Magic: Self-Attention
@@ -456,11 +479,12 @@ flowchart LR
 
     Attention --> Result
 
-    style C fill:#27ae60,color:#fff
-    style V fill:#3498db,color:#fff
+    style C fill:#27ae60,stroke-width:2px
+    style V fill:#3498db,stroke-width:2px
 ```
 
 **What attention discovers:**
+
 - "validate" and "credentials" are strongly related (security context)
 - "user" + "credentials" together imply authentication
 - This pattern matches other auth-related code even with different words
@@ -486,9 +510,9 @@ flowchart TB
         Login["'login'"]
         Cred["'credentials'"]
 
-        Auth <-->|"close"| Login
-        Login <-->|"close"| Cred
-        Auth <-->|"close"| Cred
+        Auth <-->|close| Login
+        Login <-->|close| Cred
+        Auth <-->|close| Cred
 
         Weather["'weather'"]
         Weather x--x|"far"| Auth
@@ -496,11 +520,12 @@ flowchart TB
 
     Training --> Result
 
-    style P1 fill:#27ae60,color:#fff
-    style P2 fill:#e74c3c,color:#fff
+    style P1 fill:#27ae60,stroke-width:2px
+    style P2 fill:#e74c3c,stroke-width:2px
 ```
 
 **Training data included:**
+
 - Code-documentation pairs (function + docstring)
 - StackOverflow Q&A pairs
 - GitHub issue-PR pairs
@@ -534,8 +559,8 @@ flowchart TB
     DV --> Sim
     Sim --> Score["0.78"]
 
-    style Prefix fill:#9b59b6,color:#fff
-    style Score fill:#27ae60,color:#fff
+    style Prefix fill:#9b59b6,stroke-width:2px
+    style Score fill:#27ae60,stroke-width:2px
 ```
 
 ### The Instruction Prefix in AmanMCP
@@ -551,6 +576,7 @@ func formatQueryForEmbedding(query string) string {
 ```
 
 **Why this helps (1-5% improvement):**
+
 - Tells the model "this is a search query, not code"
 - Model adjusts internal representations for retrieval
 - Better matches between questions and answers
@@ -567,8 +593,8 @@ flowchart LR
         E2 --> S2["Matches code that<br/>IMPLEMENTS auth"]
     end
 
-    style S1 fill:#f39c12,color:#fff
-    style S2 fill:#27ae60,color:#fff
+    style S1 fill:#f39c12,stroke-width:2px
+    style S2 fill:#27ae60,stroke-width:2px
 ```
 
 ---
@@ -580,6 +606,10 @@ flowchart LR
 Let's trace through exactly WHY neural embeddings outperform static:
 
 ```mermaid
+---
+config:
+  layout: elk
+---
 flowchart TB
     Query["Query: 'authentication logic'"]
 
@@ -606,11 +636,11 @@ flowchart TB
         C3["Implements authentication logic!"]
     end
 
-    S4 -->|"similarity: 0.08"| Code
-    N4 -->|"similarity: 0.71"| Code
+    S4 -->|similarity: 0.08| Code
+    N4 -->|similarity: 0.71| Code
 
-    style S4 fill:#e74c3c,color:#fff
-    style N4 fill:#27ae60,color:#fff
+    style S4 fill:#e74c3c,stroke-width:2px
+    style N4 fill:#27ae60,stroke-width:2px
 ```
 
 ### What Qwen3 "Knows" That Static Doesn't
@@ -643,6 +673,7 @@ mindmap
 ```
 
 **Static embeddings know NONE of this.** They only know:
+
 - Which characters appear in words
 - Hash collisions between tokens
 
@@ -708,8 +739,8 @@ flowchart TB
 
     Output --> Matches
 
-    style Processing fill:#9b59b6,color:#fff
-    style Matches fill:#27ae60,color:#fff
+    style Processing fill:#9b59b6,stroke-width:2px
+    style Matches fill:#27ae60,stroke-width:2px
 ```
 
 ### The Quality Improvement Explained
@@ -756,11 +787,11 @@ flowchart TB
     Neural --> Q{Quality}
     Static --> Q
 
-    Q -->|"100%"| Neural
-    Q -->|"~35%"| Static
+    Q -->|100%| Neural
+    Q -->|~35%| Static
 
-    style Neural fill:#27ae60,color:#fff
-    style Static fill:#f39c12,color:#fff
+    style Neural fill:#27ae60,stroke-width:2px
+    style Static fill:#f39c12,stroke-width:2px
 ```
 
 ### Empirical Quality Measurements
@@ -809,17 +840,21 @@ flowchart TB
         Q3 --> N3["Neural: 0.71 ✅"]
     end
 
-    style S1 fill:#27ae60,color:#fff
-    style N1 fill:#27ae60,color:#fff
-    style S2 fill:#e74c3c,color:#fff
-    style N2 fill:#27ae60,color:#fff
-    style S3 fill:#e74c3c,color:#fff
-    style N3 fill:#27ae60,color:#fff
+    style S1 fill:#27ae60,stroke-width:2px
+    style N1 fill:#27ae60,stroke-width:2px
+    style S2 fill:#e74c3c,stroke-width:2px
+    style N2 fill:#27ae60,stroke-width:2px
+    style S3 fill:#e74c3c,stroke-width:2px
+    style N3 fill:#27ae60,stroke-width:2px
 ```
 
 ### Why the Quality Gap?
 
 ```mermaid
+---
+config:
+  layout: elk
+---
 flowchart TB
     subgraph Training["Neural Model Training"]
         Data["Billions of text pairs"]
@@ -848,8 +883,8 @@ flowchart TB
         SLogin x--x|"far apart"| SCred
     end
 
-    style VectorSpace fill:#d5f4e6,color:#000
-    style StaticSpace fill:#fadbd8,color:#000
+    style VectorSpace fill:#d5f4e6,stroke-width:2px
+    style StaticSpace fill:#fadbd8,stroke-width:2px
 ```
 
 Neural embeddings learn from context that "login", "authentication", and "credentials" are related. Static embeddings only see that they share no common substrings.
@@ -880,10 +915,10 @@ flowchart TB
     Q4 -->|Yes| Static2["⚠️ Use Static<br/>(acceptable)"]
     Q4 -->|No| Static3["⚠️ Use Static<br/>(limited quality)"]
 
-    style Neural fill:#27ae60,color:#fff
-    style Static1 fill:#f39c12,color:#fff
-    style Static2 fill:#f39c12,color:#fff
-    style Static3 fill:#e74c3c,color:#fff
+    style Neural fill:#27ae60,stroke-width:2px
+    style Static1 fill:#f39c12,stroke-width:2px
+    style Static2 fill:#f39c12,stroke-width:2px
+    style Static3 fill:#e74c3c,stroke-width:2px
 ```
 
 ### Appropriate Use Cases
@@ -912,7 +947,7 @@ flowchart LR
         B4["'How does auth work?'"]
     end
 
-    style Bad fill:#fadbd8,color:#000
+    style Bad fill:#fadbd8,stroke-width:2px
 ```
 
 ---
@@ -939,10 +974,10 @@ flowchart TB
     Match -->|Sparse| No["Only if tokens overlap"]
     Match -->|Dense| Yes["Even with zero shared words"]
 
-    style Sparse fill:#f39c12,color:#fff
-    style Dense fill:#27ae60,color:#fff
-    style No fill:#e74c3c,color:#fff
-    style Yes fill:#27ae60,color:#fff
+    style Sparse fill:#f39c12,stroke-width:2px
+    style Dense fill:#27ae60,stroke-width:2px
+    style No fill:#e74c3c,stroke-width:2px
+    style Yes fill:#27ae60,stroke-width:2px
 ```
 
 **Why this matters**: Sparse vectors can only match when hash collisions align. Dense vectors capture gradual similarity.
@@ -967,8 +1002,8 @@ flowchart LR
         NDot --> NResult["cos = 0.72<br/>(similar meaning)"]
     end
 
-    style SResult fill:#e74c3c,color:#fff
-    style NResult fill:#27ae60,color:#fff
+    style SResult fill:#e74c3c,stroke-width:2px
+    style NResult fill:#27ae60,stroke-width:2px
 ```
 
 ---
@@ -1059,14 +1094,14 @@ flowchart TB
     Switch -->|mlx| MLX["MLXEmbedder"]
     Switch -->|auto| Auto{Detect<br/>available}
 
-    Auto -->|"MLX available"| MLX
-    Auto -->|"Ollama available"| Ollama
-    Auto -->|"Nothing available"| Error["❌ Error<br/>(BUG-073)"]
+    Auto -->|MLX available| MLX
+    Auto -->|Ollama available| Ollama
+    Auto -->|Nothing available| Error["❌ Error<br/>(BUG-073)"]
 
-    style Static fill:#f39c12,color:#fff
-    style Ollama fill:#9b59b6,color:#fff
-    style MLX fill:#e74c3c,color:#fff
-    style Error fill:#c0392b,color:#fff
+    style Static fill:#f39c12,stroke-width:2px
+    style Ollama fill:#9b59b6,stroke-width:2px
+    style MLX fill:#e74c3c,stroke-width:2px
+    style Error fill:#c0392b,stroke-width:2px
 ```
 
 ---
@@ -1126,8 +1161,8 @@ flowchart TB
         end
     end
 
-    style Static fill:#f39c12,color:#fff
-    style Qwen3 fill:#27ae60,color:#fff
+    style Static fill:#f39c12,stroke-width:2px
+    style Qwen3 fill:#27ae60,stroke-width:2px
 ```
 
 Static embeddings are a **pragmatic engineering solution** for scenarios where neural embeddings aren't available or appropriate.
@@ -1154,9 +1189,9 @@ flowchart LR
         A3["Synonym matching needed"]
     end
 
-    style Use fill:#f39c12,color:#000
-    style UseQwen fill:#27ae60,color:#fff
-    style Avoid fill:#fadbd8,color:#000
+    style Use fill:#f39c12,stroke-width:2px
+    style UseQwen fill:#27ae60,stroke-width:2px
+    style Avoid fill:#fadbd8,stroke-width:2px
 ```
 
 ### The Numbers That Matter
@@ -1186,20 +1221,24 @@ xychart-beta
 ## Further Reading
 
 ### Static Embeddings
+
 - [FNV Hash Algorithm](https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function) - Hash function used in StaticEmbedder
 - [Bag of Words Models](https://en.wikipedia.org/wiki/Bag-of-words_model) - Conceptual foundation
 
 ### Qwen3 and Neural Embeddings
+
 - [Qwen3-Embedding on HuggingFace](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B) - Model documentation
 - [Qwen3 Technical Report](https://arxiv.org/abs/2309.16609) - Architecture details
 - [Ollama Documentation](https://ollama.ai/library/qwen3-embedding) - Running Qwen3 locally
 
 ### AmanMCP Documentation
+
 - [Vector Search Concepts](../guides/vector-search-concepts.md) - How HNSW and embeddings work together
 - [Smaller Models, Better Search](./smaller-models-better-search.md) - Neural model comparison
 - [ADR-036: Multi-Backend Embedding Testing](../reference/decisions/ADR-036-multi-backend-embedding-testing.md) - Architecture decision
 
 ### Deep Dives
+
 - [Attention Is All You Need](https://arxiv.org/abs/1706.03762) - Transformer architecture paper
 - [Sentence-BERT](https://arxiv.org/abs/1908.10084) - Sentence embeddings for semantic similarity
 - [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard) - Embedding model benchmarks

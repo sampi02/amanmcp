@@ -1,11 +1,13 @@
 # AST-Based Code Chunking with Tree-sitter
 
 > **Learning Objectives:**
+>
 > - Understand why AST-based chunking beats naive text splitting for code
 > - Learn the trade-offs of using tree-sitter (CGO vs pure Go)
 > - Apply proper memory management for tree-sitter in Go
 >
 > **Prerequisites:**
+>
 > - Basic understanding of AST (Abstract Syntax Tree)
 > - Familiarity with Go and CGO
 >
@@ -16,6 +18,54 @@
 Tree-sitter provides universal AST parsing for 40+ languages, enabling semantic code chunks that preserve function boundaries. This is critical for code search because embedding partial functions produces poor search results. The trade-off is CGO complexity, but for code-specific RAG, AST-aware chunking is non-negotiable.
 
 ## Why AST-Based Chunking?
+
+### Chunking Strategy Comparison
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ff6b6b','primaryTextColor':'#212529','primaryBorderColor':'#ee5a5a','lineColor':'#495057','secondaryColor':'#51cf66','tertiaryColor':'#4dabf7','background':'#f8f9fa','mainBkg':'#ffffff','secondBkg':'#e9ecef','fontSize':'14px','fontFamily':'system-ui, -apple-system, sans-serif'}}}%%
+graph TB
+    subgraph Naive["<b>❌ Naive Text Splitting</b>"]
+        direction TB
+        N1["<b>Split at 500 chars</b>"]
+        N2["Broken context"]
+        N3["Lost semantics"]
+        N4["Poor embeddings"]
+        N5["<b>❌ Search fails</b>"]
+
+        N1 -.->|arbitrary cut| N2
+        N2 -.->|incomplete code| N3
+        N3 -.->|noisy vectors| N4
+        N4 -.->|missed results| N5
+    end
+
+    subgraph AST["<b>✅ AST-Based Chunking (Tree-sitter)</b>"]
+        direction TB
+        A1["<b>Parse AST</b>"]
+        A2["Identify semantic boundaries<br/><i>(functions, classes, methods)</i>"]
+        A3["Complete units"]
+        A4["Better embeddings"]
+        A5["<b>✅ Search succeeds</b>"]
+
+        A1 ==>|understand structure| A2
+        A2 ==>|preserve boundaries| A3
+        A3 ==>|full context| A4
+        A4 ==>|accurate matches| A5
+    end
+
+    style Naive fill:#fff5f5,stroke:#ff6b6b,stroke-width:3px,color:#c92a2a
+    style AST fill:#f3faf7,stroke:#51cf66,stroke-width:3px,color:#2b8a3e
+
+    style N1 fill:#ffe3e3,stroke:#ff6b6b,stroke-width:2px,color:#c92a2a
+    style N2 fill:#ffffff,stroke:#ff8787,stroke-width:2px,color:#c92a2a
+    style N3 fill:#ffffff,stroke:#ff8787,stroke-width:2px,color:#c92a2a
+    style N4 fill:#ffffff,stroke:#ff8787,stroke-width:2px,color:#c92a2a
+    style N5 fill:#ff8787,stroke:#fa5252,stroke-width:3px,color:#fff
+    style A1 fill:#d0ebff,stroke:#4dabf7,stroke-width:2px,color:#1864ab
+    style A2 fill:#e5dbff,stroke:#9775fa,stroke-width:2px,color:#5f3dc4
+    style A3 fill:#ffffff,stroke:#69db7c,stroke-width:2px,color:#2b8a3e
+    style A4 fill:#ffffff,stroke:#69db7c,stroke-width:2px,color:#2b8a3e
+    style A5 fill:#51cf66,stroke:#40c057,stroke-width:3px,color:#fff
+```
 
 ### The Problem with Text Splitting
 
@@ -95,6 +145,7 @@ func extractFunctions(source []byte, lang *sitter.Language) []Chunk {
 ```
 
 Without tree-sitter, you need:
+
 - `go/parser` for Go
 - `typescript-eslint` for TypeScript
 - `ast` module for Python
@@ -124,6 +175,7 @@ Tree-sitter is fast:
 - **Parallel safe**: Parse multiple files concurrently
 
 For a 10,000 file codebase:
+
 - Naive regex: Minutes of parsing
 - Tree-sitter: Seconds (with parallelism)
 
@@ -182,9 +234,114 @@ func processTree(tree *sitter.Tree) {
 }
 ```
 
+### Memory Management Flow
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#4dabf7','primaryTextColor':'#212529','primaryBorderColor':'#339af0','lineColor':'#495057','secondaryColor':'#51cf66','tertiaryColor':'#ffd43b','background':'#f8f9fa','mainBkg':'#ffffff','secondBkg':'#e9ecef','fontSize':'14px','fontFamily':'system-ui, -apple-system, sans-serif'}}}%%
+flowchart TD
+    Start["<b>Create Parser</b><br/><code>parser := sitter.NewParser()</code>"]
+    Defer1["<b>defer parser.Close()</b><br/>✅ MANDATORY"]
+    SetLang["<b>Set Language</b><br/><code>parser.SetLanguage(golang.Language())</code>"]
+    Parse["<b>Parse Source</b><br/><code>tree := parser.Parse(source, nil)</code>"]
+    ReturnTree["<b>Return tree to caller</b>"]
+    CallerDefer["<b>Caller: defer tree.Close()</b><br/>✅ MANDATORY"]
+    CreateCursor["<b>Create Cursor</b><br/><code>cursor := sitter.NewTreeCursor()</code>"]
+    CursorDefer["<b>defer cursor.Close()</b><br/>✅ MANDATORY"]
+    Traverse["<b>Traverse AST</b>"]
+    End["<b>Function ends</b><br/>All defers execute"]
+    Cleanup1["<code>cursor.Close()</code> called"]
+    Cleanup2["<code>tree.Close()</code> called"]
+    Cleanup3["<code>parser.Close()</code> called"]
+    Done["<b>✅ No memory leaks</b>"]
+
+    Start ==>|allocate| Defer1
+    Defer1 ==>|configure| SetLang
+    SetLang ==>|parse| Parse
+    Parse ==>|transfer ownership| ReturnTree
+    ReturnTree ==>|register cleanup| CallerDefer
+    CallerDefer ==>|navigate| CreateCursor
+    CreateCursor ==>|register cleanup| CursorDefer
+    CursorDefer ==>|work| Traverse
+    Traverse ==>|exit scope| End
+    End -.->|LIFO order| Cleanup1
+    Cleanup1 -.->|then| Cleanup2
+    Cleanup2 -.->|then| Cleanup3
+    Cleanup3 ==>|success| Done
+
+    style Start fill:#d0ebff,stroke:#4dabf7,stroke-width:3px,color:#1864ab
+    style SetLang fill:#ffffff,stroke:#74c0fc,stroke-width:2px,color:#1864ab
+    style Parse fill:#ffffff,stroke:#74c0fc,stroke-width:2px,color:#1864ab
+    style ReturnTree fill:#ffffff,stroke:#74c0fc,stroke-width:2px,color:#1864ab
+    style CreateCursor fill:#ffffff,stroke:#74c0fc,stroke-width:2px,color:#1864ab
+    style Traverse fill:#ffffff,stroke:#74c0fc,stroke-width:2px,color:#1864ab
+    style Defer1 fill:#d3f9d8,stroke:#51cf66,stroke-width:3px,color:#2b8a3e
+    style CallerDefer fill:#d3f9d8,stroke:#51cf66,stroke-width:3px,color:#2b8a3e
+    style CursorDefer fill:#d3f9d8,stroke:#51cf66,stroke-width:3px,color:#2b8a3e
+    style Done fill:#51cf66,stroke:#40c057,stroke-width:3px,color:#fff
+    style End fill:#fff3bf,stroke:#ffd43b,stroke-width:2px,color:#f08c00
+    style Cleanup1 fill:#e7f5ff,stroke:#74c0fc,stroke-width:2px,color:#1864ab
+    style Cleanup2 fill:#e7f5ff,stroke:#74c0fc,stroke-width:2px,color:#1864ab
+    style Cleanup3 fill:#e7f5ff,stroke:#74c0fc,stroke-width:2px,color:#1864ab
+```
+
+### Memory Leak vs Proper Cleanup
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ff6b6b','primaryTextColor':'#212529','primaryBorderColor':'#ee5a5a','lineColor':'#495057','secondaryColor':'#51cf66','tertiaryColor':'#ffd43b','background':'#f8f9fa','mainBkg':'#ffffff','secondBkg':'#e9ecef','fontSize':'14px','fontFamily':'system-ui, -apple-system, sans-serif'}}}%%
+graph TB
+    subgraph Wrong["<b>❌ Wrong: No Close() Calls</b>"]
+        direction TB
+        W1["<code>parser := sitter.NewParser()</code>"]
+        W2["<code>tree := parser.Parse(...)</code>"]
+        W3["<code>cursor := sitter.NewTreeCursor()</code>"]
+        W4["<b>Process and return</b>"]
+        W5["<b>❌ Memory leaked</b><br/>C heap not freed"]
+        W6["<b>After 10,000 files:</b><br/>💥 OOM crash"]
+
+        W1 -.->|no cleanup| W2
+        W2 -.->|no cleanup| W3
+        W3 -.->|no cleanup| W4
+        W4 -.->|leak| W5
+        W5 x-.-x|inevitable| W6
+    end
+
+    subgraph Right["<b>✅ Right: defer Close() Pattern</b>"]
+        direction TB
+        R1["<code>parser := sitter.NewParser()</code><br/><code>defer parser.Close()</code>"]
+        R2["<code>tree := parser.Parse(...)</code><br/><code>defer tree.Close()</code>"]
+        R3["<code>cursor := sitter.NewTreeCursor()</code><br/><code>defer cursor.Close()</code>"]
+        R4["<b>Process and return</b>"]
+        R5["<b>✅ All memory freed</b><br/>C heap cleaned up"]
+        R6["<b>After 10,000 files:</b><br/>✨ Stable memory"]
+
+        R1 ==>|cleanup registered| R2
+        R2 ==>|cleanup registered| R3
+        R3 ==>|cleanup registered| R4
+        R4 ==>|auto cleanup| R5
+        R5 ==>|healthy| R6
+    end
+
+    style Wrong fill:#fff5f5,stroke:#ff6b6b,stroke-width:3px,color:#c92a2a
+    style Right fill:#f3faf7,stroke:#51cf66,stroke-width:3px,color:#2b8a3e
+
+    style W1 fill:#ffe3e3,stroke:#ff6b6b,stroke-width:2px,color:#c92a2a
+    style W2 fill:#ffffff,stroke:#ff8787,stroke-width:2px,color:#c92a2a
+    style W3 fill:#ffffff,stroke:#ff8787,stroke-width:2px,color:#c92a2a
+    style W4 fill:#ffffff,stroke:#ff8787,stroke-width:2px,color:#c92a2a
+    style W5 fill:#ff8787,stroke:#fa5252,stroke-width:3px,color:#fff
+    style W6 fill:#c92a2a,stroke:#a61e4d,stroke-width:3px,color:#fff
+    style R1 fill:#d3f9d8,stroke:#51cf66,stroke-width:2px,color:#2b8a3e
+    style R2 fill:#ffffff,stroke:#69db7c,stroke-width:2px,color:#2b8a3e
+    style R3 fill:#ffffff,stroke:#69db7c,stroke-width:2px,color:#2b8a3e
+    style R4 fill:#ffffff,stroke:#69db7c,stroke-width:2px,color:#2b8a3e
+    style R5 fill:#51cf66,stroke:#40c057,stroke-width:3px,color:#fff
+    style R6 fill:#2b8a3e,stroke:#2f9e44,stroke-width:3px,color:#fff
+```
+
 **Why Close() is required:**
 
 CGO allocates memory in C heap, not Go heap. Go's GC:
+
 - Doesn't know about C allocations
 - Can't track reference counts across CGO boundary
 - Finalizers (cleanup hooks) are unreliable with CGO
@@ -217,6 +374,7 @@ The official bindings deliberately avoid finalizers because:
 For code search: **Yes, absolutely.**
 
 The alternative is regex-based parsing which:
+
 - Misses edge cases constantly
 - Requires maintenance per language
 - Produces inferior chunks
@@ -282,12 +440,14 @@ RUN go build -o /app/binary ./cmd/...
 The quality of your code search is directly proportional to chunk quality. A chunk should answer: "What is this unit of code doing?"
 
 Good chunks:
+
 - Complete functions
 - Complete methods
 - Complete type definitions
 - Complete test cases
 
 Bad chunks:
+
 - Arbitrary 500-character segments
 - Half a function
 - Mixed content (end of one function + start of another)
@@ -297,6 +457,7 @@ Bad chunks:
 For code-specific applications, accept CGO complexity. Pure-Go alternatives exist (regex, heuristics) but produce inferior results.
 
 The decision tree:
+
 - Building generic text search? Skip CGO
 - Building code search? Accept CGO
 
@@ -317,6 +478,7 @@ defer parser.Close()  // Same discipline required
 ### 4. Test with Real Codebases
 
 Your test files will be syntactically perfect. Real codebases contain:
+
 - Syntax errors
 - Generated code with unusual patterns
 - Mixed indentation
@@ -350,8 +512,3 @@ This modularity means your binary only includes grammars you use, keeping binary
 - [Embedding Models](./embedding-models.md) - Model selection for code embeddings
 - [Tree-sitter Official Documentation](https://tree-sitter.github.io/)
 - [Official Go Bindings](https://github.com/tree-sitter/go-tree-sitter)
-
----
-
-**Original Source:** `.aman-pm/decisions/ADR-003` (internal)
-**Last Updated:** 2026-01-16

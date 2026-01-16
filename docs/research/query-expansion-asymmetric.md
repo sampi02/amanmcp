@@ -1,11 +1,13 @@
 # Query Expansion in Hybrid Search: Why Asymmetry Matters
 
 > **Learning Objectives:**
+>
 > - Understand why query expansion helps BM25 but hurts vector search
 > - Learn the fundamental difference between term matching and embeddings
 > - Apply asymmetric query handling to hybrid search systems
 >
 > **Prerequisites:**
+>
 > - [Hybrid Search Concepts](../concepts/hybrid-search.md)
 > - Basic understanding of BM25 and vector search
 >
@@ -16,6 +18,43 @@
 ## TL;DR
 
 Query expansion improves BM25 search but **degrades** vector search. The solution is asymmetric query handling: expand queries for BM25, use original queries for vectors. This counter-intuitive finding increased our validation pass rate from 75% to 80%.
+
+---
+
+## Asymmetric Query Expansion Architecture
+
+How we handle queries differently for each backend:
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#667eea','primaryTextColor':'#fff','primaryBorderColor':'#5568d3','lineColor':'#4a5568','secondaryColor':'#48bb78','tertiaryColor':'#f56565','fontFamily':'system-ui, -apple-system, sans-serif'}}}%%
+flowchart LR
+    Query["<b>User Query</b><br/><i>search function</i>"] --> Split{<b>Asymmetric<br/>Processing</b>}
+
+    Split -->|"<b>BM25 Path</b>"| Expand["<b>Query Expansion</b><br/><i>search Search find query<br/>function func fn method</i>"]
+    Split -->|"<b>Vector Path</b>"| Original["<b>Original Query</b><br/><i>search function</i><br/><b>(NO expansion)</b>"]
+
+    Expand --> BM25["<b>BM25 Search</b><br/>Term matching"]
+    Original --> Vector["<b>Vector Search</b><br/>Embedding similarity"]
+
+    BM25 --> Results1["<b>BM25 Results</b><br/><span style='color:#48bb78'>+15% improvement</span>"]
+    Vector --> Results2["<b>Vector Results</b><br/>Maintained quality"]
+
+    Results1 --> RRF["<b>RRF Fusion</b><br/>k=60"]
+    Results2 --> RRF
+
+    RRF --> Final["<b>Final Results</b><br/><span style='color:#48bb78'>+5% overall</span>"]
+
+    style Query fill:#667eea,stroke:#5568d3,stroke-width:3px,color:#fff
+    style Split fill:#f6ad55,stroke:#ed8936,stroke-width:3px,color:#fff
+    style Expand fill:#48bb78,stroke:#38a169,stroke-width:3px,color:#fff
+    style Original fill:#4299e1,stroke:#3182ce,stroke-width:3px,color:#fff
+    style BM25 fill:#9f7aea,stroke:#805ad5,stroke-width:3px,color:#fff
+    style Vector fill:#9f7aea,stroke:#805ad5,stroke-width:3px,color:#fff
+    style Results1 fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style Results2 fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style RRF fill:#fc8181,stroke:#f56565,stroke-width:3px,color:#fff
+    style Final fill:#48bb78,stroke:#38a169,stroke-width:3px,color:#fff
+```
 
 ---
 
@@ -154,26 +193,47 @@ The expanded embedding is less precise. It matches more documents, but the top r
 
 ### Visualizing the Dilution
 
-Think of embedding space as a map:
+Think of embedding space as a map where proximity indicates semantic similarity:
 
-```
-                    ╭─────────────────────────────────────╮
-                    │          EMBEDDING SPACE            │
-                    │                                     │
-                    │    "query"  •                       │
-                    │              \                      │
-                    │               •  "search"           │
-                    │              /  \                   │
-   Expanded query   │    "find" •     • ← Original query │
-   lands here ──────┼─────▶ ◉          ("Search function")│
-                    │       / \                           │
-                    │"func"•   • "Engine"                 │
-                    │                                     │
-                    │    "method" •                       │
-                    ╰─────────────────────────────────────╯
+```mermaid
+---
+config:
+  layout: elk
+  look: neo
+  theme: neo
+---
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#667eea','primaryTextColor':'#fff','primaryBorderColor':'#5568d3','lineColor':'#4a5568','fontFamily':'system-ui, -apple-system, sans-serif'}}}%%
+graph TB
+    subgraph space["<b>EMBEDDING SPACE</b><br/>(semantic similarity = proximity)"]
+        orig["<b>🎯 Original Query</b><br/><i>Search function</i><br/><br/>Lands precisely in<br/>target concept area"]
+        search["<b>search</b>"]
+        func["<b>func</b>"]
+        query["<b>query</b>"]
+        find["<b>find</b>"]
+        engine["<b>Engine</b>"]
+        method["<b>method</b>"]
+        expand["<b>🌐 Expanded Query</b><br/><i>search + find + query<br/>+ func + Engine + method</i><br/><br/>Diluted embedding<br/>lands between concepts"]
+
+        search -.->|close| orig
+        func -.->|close| orig
+        query -.->|moderate| expand
+        find -.->|moderate| expand
+        engine -.->|moderate| expand
+        method -.->|distant| expand
+    end
+
+    style orig fill:#48bb78,stroke:#38a169,stroke-width:3px,color:#fff
+    style expand fill:#fc8181,stroke:#f56565,stroke-width:3px,color:#fff
+    style search fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style func fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style query fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style find fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style engine fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style method fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style space fill:#faf5ff,stroke:#9f7aea,stroke-width:2px,color:#2d3748
 ```
 
-The original query lands precisely where "Search function" concepts cluster. The expanded query lands in the middle of multiple concepts---less precise, worse results.
+**Key insight:** The original query (🎯) lands precisely where "Search function" concepts cluster. The expanded query (🌐) lands in the middle of multiple concepts—less precise, worse results.
 
 ---
 
@@ -290,28 +350,25 @@ We assumed expansion would help both backends. It did not. The only way to know 
 
 ## When to Expand Queries (Decision Tree)
 
-```
-                         Query Expansion Decision
-                                  │
-                                  ▼
-                    ┌─────────────────────────────┐
-                    │   Which search backend?     │
-                    └─────────────────────────────┘
-                         │                │
-                    BM25 │                │ Vector
-                         ▼                ▼
-            ┌────────────────┐    ┌────────────────┐
-            │ Expand query   │    │ Use original   │
-            │ with synonyms, │    │ query. Trust   │
-            │ case variants, │    │ the embedding  │
-            │ abbreviations  │    │ model.         │
-            └────────────────┘    └────────────────┘
-                         │                │
-                         └───────┬────────┘
-                                 ▼
-                    ┌─────────────────────────────┐
-                    │   Fuse results with RRF     │
-                    └─────────────────────────────┘
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#667eea','primaryTextColor':'#fff','primaryBorderColor':'#5568d3','lineColor':'#4a5568','secondaryColor':'#48bb78','tertiaryColor':'#f56565','fontFamily':'system-ui, -apple-system, sans-serif'}}}%%
+flowchart TD
+    Start["<b>Query Expansion Decision</b>"] --> Backend{<b>Which Search<br/>Backend?</b>}
+
+    Backend -->|"<b>BM25</b>"| Expand["<b>✅ EXPAND Query</b><br/>• Add synonyms<br/>• Add case variants<br/>• Add abbreviations"]
+    Backend -->|"<b>Vector</b>"| Original["<b>✅ USE ORIGINAL</b><br/>• Trust embedding model<br/>• Embeddings capture semantics<br/>• Expansion dilutes meaning"]
+
+    Expand --> Fusion["<b>Fuse Results with RRF</b><br/>k=60"]
+    Original --> Fusion
+
+    Fusion --> Result["<b>Final Ranked Results</b>"]
+
+    style Start fill:#667eea,stroke:#5568d3,stroke-width:3px,color:#fff
+    style Backend fill:#f6ad55,stroke:#ed8936,stroke-width:3px,color:#fff
+    style Expand fill:#48bb78,stroke:#38a169,stroke-width:3px,color:#fff
+    style Original fill:#4299e1,stroke:#3182ce,stroke-width:3px,color:#fff
+    style Fusion fill:#9f7aea,stroke:#805ad5,stroke-width:3px,color:#fff
+    style Result fill:#48bb78,stroke:#38a169,stroke-width:3px,color:#fff
 ```
 
 ---
@@ -320,30 +377,53 @@ We assumed expansion would help both backends. It did not. The only way to know 
 
 Understanding the fundamental difference helps explain the asymmetry:
 
-### Lexical Space (BM25)
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#667eea','primaryTextColor':'#fff','primaryBorderColor':'#5568d3','lineColor':'#4a5568','fontFamily':'system-ui, -apple-system, sans-serif'}}}%%
+graph TB
+    subgraph lexical["<b>LEXICAL SPACE (BM25)</b>"]
+        direction TB
+        L1["<b>car</b><br/>Token 1"]
+        L2["<b>automobile</b><br/>Token 2"]
+        L3["<b>vehicle</b><br/>Token 3"]
+        L4["<b>auto</b><br/>Token 4"]
 
-- Documents are bags of tokens
-- Matching is exact or near-exact
-- "car" and "automobile" are completely different
-- Synonyms must be explicitly added
+        L1 -.->|"NO relationship"| L2
+        L1 -.->|"NO relationship"| L3
+        L2 -.->|"NO relationship"| L4
 
-### Embedding Space (Vector)
+        Lnote["<b>Properties:</b><br/>• Bags of tokens<br/>• Exact matching only<br/>• car ≠ automobile<br/>• Must add synonyms explicitly"]
+    end
 
-- Documents are points in high-dimensional space
-- Matching is by distance/similarity
-- "car" and "automobile" are nearby points
-- Relationships are learned from data
+    subgraph embedding["<b>EMBEDDING SPACE (Vector)</b>"]
+        direction TB
+        E1["<b>car</b>"]
+        E2["<b>automobile</b>"]
+        E3["<b>vehicle</b>"]
+        E4["<b>auto</b>"]
 
-```
-LEXICAL SPACE                    EMBEDDING SPACE
-─────────────────                ─────────────────────────
-                                        "vehicle"
-"car" ─────────── far ─────────────        •
-"automobile" ─────────── far ──────── "car" • • "automobile"
-                                            \│/
-No connection unless you add it         "auto" •
+        E3 <--> E1
+        E3 <--> E2
+        E1 <--> E2
+        E1 <--> E4
+        E2 <--> E4
 
-                                 Relationships are implicit
+        Enote["<b>Properties:</b><br/>• Points in vector space<br/>• Similarity matching<br/>• car ≈ automobile<br/>• Relationships learned from data"]
+    end
+
+    style lexical fill:#fff5f5,stroke:#fc8181,stroke-width:2px,color:#2d3748
+    style embedding fill:#f0fff4,stroke:#48bb78,stroke-width:2px,color:#2d3748
+
+    style L1 fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style L2 fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style L3 fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style L4 fill:#e2e8f0,stroke:#cbd5e0,stroke-width:2px,color:#2d3748
+    style Lnote fill:#fff5f5,stroke:#fc8181,stroke-width:1px,stroke-dasharray: 5 5,color:#2d3748
+
+    style E1 fill:#d4f4dd,stroke:#48bb78,stroke-width:2px,color:#2d3748
+    style E2 fill:#d4f4dd,stroke:#48bb78,stroke-width:2px,color:#2d3748
+    style E3 fill:#d4f4dd,stroke:#48bb78,stroke-width:2px,color:#2d3748
+    style E4 fill:#d4f4dd,stroke:#48bb78,stroke-width:2px,color:#2d3748
+    style Enote fill:#f0fff4,stroke:#48bb78,stroke-width:1px,stroke-dasharray: 5 5,color:#2d3748
 ```
 
 **Implication:** Query preprocessing that helps lexical matching (synonyms, stemming, expansion) often hurts embedding matching (dilutes precision).
@@ -366,8 +446,3 @@ This finding aligns with broader research in information retrieval:
 
 - [Hybrid Search Concepts](../concepts/hybrid-search.md) - How BM25 and vector search combine
 - [Specialization vs Generalization](./specialization-vs-generalization.md) - Related research on search tuning
-
----
-
-**Original Source:** `.aman-pm/decisions/ADR-034` (internal)
-**Last Updated:** 2026-01-16

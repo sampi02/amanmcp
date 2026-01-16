@@ -1,11 +1,13 @@
 # When Semantic Search Fails: The Vocabulary Mismatch Problem
 
 > **Learning Objectives:**
+>
 > - Understand why semantic search fails for abstract queries on code
 > - Learn how to diagnose vocabulary mismatch in your own systems
 > - Apply query formulation best practices for code search
 >
 > **Prerequisites:**
+>
 > - [Vector Search Concepts](../concepts/vector-search-concepts.md)
 > - Basic understanding of embeddings
 >
@@ -33,6 +35,45 @@ internal/embed/retry.go
 ```
 
 Both files implement exactly what the user asked for. So why did semantic search fail?
+
+---
+
+## Query Type Success Matrix
+
+Different query patterns have dramatically different success rates:
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#4dabf7','primaryTextColor':'#212529','primaryBorderColor':'#339af0','lineColor':'#495057','secondaryColor':'#51cf66','tertiaryColor':'#ffd43b','background':'#f8f9fa','mainBkg':'#ffffff','secondBkg':'#e9ecef','fontSize':'14px','fontFamily':'system-ui, -apple-system, sans-serif'}}}%%
+graph TB
+    subgraph Success["<b>Query Type Success Rates</b>"]
+        direction TB
+        A["<b>Abstract Concepts</b><br/>❌ 0% Success<br/><i>User vocabulary</i>"]
+        A1["<b>No Results</b><br/>💔 Failed"]
+        B["<b>Mixed Terms</b><br/>⚠️ 50% Success<br/><i>Partial match</i>"]
+        B1["<b>Partial Results</b><br/>🔶 Some matches"]
+        C["<b>Exact Identifiers</b><br/>✅ 100% Success<br/><i>Code vocabulary</i>"]
+        C1["<b>Perfect Match</b><br/>✨ Found all"]
+        D["<b>Function Names</b><br/>✅ 100% Success<br/><i>Precise targeting</i>"]
+        D1["<b>Perfect Match</b><br/>🎯 Exact hit"]
+
+        A -.->|"error handling retry backoff"| A1
+        B -->|"Retry function exponential"| B1
+        C ==>|"RetryConfig MaxRetries"| C1
+        D ==>|"DownloadWithRetry context"| D1
+    end
+
+    style Success fill:#f8f9fa,stroke:#495057,stroke-width:2px,color:#212529
+    style A fill:#ffe3e3,stroke:#ff6b6b,stroke-width:3px,color:#c92a2a
+    style A1 fill:#c92a2a,stroke:#a61e4d,stroke-width:3px,color:#fff
+    style B fill:#fff4e6,stroke:#ffd43b,stroke-width:2px,color:#f08c00
+    style B1 fill:#ffd43b,stroke:#fab005,stroke-width:2px,color:#f08c00
+    style C fill:#d3f9d8,stroke:#51cf66,stroke-width:3px,color:#2b8a3e
+    style C1 fill:#51cf66,stroke:#40c057,stroke-width:3px,color:#fff
+    style D fill:#d3f9d8,stroke:#51cf66,stroke-width:3px,color:#2b8a3e
+    style D1 fill:#51cf66,stroke:#40c057,stroke-width:3px,color:#fff
+```
+
+**Key Finding:** Abstract queries (0% success) vs concrete identifiers (100% success) - a massive quality gap driven by vocabulary mismatch.
 
 ---
 
@@ -75,6 +116,54 @@ The function is called `Retry`, not `RetryWithBackoff`. The configuration type i
 
 ### The "5 Whys" Analysis
 
+```mermaid
+---
+config:
+  layout: elk
+  theme: base
+  themeVariables:
+    primaryColor: '#4dabf7'
+    primaryTextColor: '#212529'
+    primaryBorderColor: '#339af0'
+    lineColor: '#495057'
+    secondaryColor: '#51cf66'
+    tertiaryColor: '#ffd43b'
+    background: '#f8f9fa'
+    mainBkg: '#ffffff'
+    secondBkg: '#e9ecef'
+    fontSize: 14px
+    fontFamily: ''
+---
+flowchart TB
+ subgraph Analysis["<b>Root Cause Fishbone Diagram</b>"]
+    direction LR
+        Problem@{ label: "<b>❌ Query Failed</b><br><i>'error handling retry backoff'</i><br>Zero results returned" }
+        Why1@{ label: "<b>Why 1:</b><br>Embedding didn't match<br><i>Similarity too low</i>" }
+        Why2["<b>Why 2:</b><br>Abstract vs Concrete<br><i>Vocabulary mismatch</i>"]
+        Why3["<b>Why 3:</b><br>Backoff only in comments<br><i>Not a code symbol</i>"]
+        Why4["<b>Why 4:</b><br>Comments have low weight<br><i>Function names dominate</i>"]
+        Why5["<b>Why 5:</b><br>Failure mode not anticipated<br><i>Edge case discovered</i>"]
+        Root["<b>🎯 ROOT CAUSE:</b><br>Vocabulary Gap<br><i>User language ≠ Code identifiers</i>"]
+  end
+    Problem == dig deeper ==> Why1
+    Why1 == dig deeper ==> Why2
+    Why2 == dig deeper ==> Why3
+    Why3 == dig deeper ==> Why4
+    Why4 == dig deeper ==> Why5
+    Why5 == identified ==> Root
+
+    Problem@{ shape: rect}
+    Why1@{ shape: rect}
+    style Problem fill:#ff8787,stroke:#ff6b6b,stroke-width:3px,color:#fff
+    style Why1 fill:#d0ebff,stroke:#4dabf7,stroke-width:2px,color:#1864ab
+    style Why2 fill:#d0ebff,stroke:#4dabf7,stroke-width:2px,color:#1864ab
+    style Why3 fill:#d0ebff,stroke:#4dabf7,stroke-width:2px,color:#1864ab
+    style Why4 fill:#d0ebff,stroke:#4dabf7,stroke-width:2px,color:#1864ab
+    style Why5 fill:#d0ebff,stroke:#4dabf7,stroke-width:2px,color:#1864ab
+    style Root fill:#51cf66,stroke:#40c057,stroke-width:3px,color:#fff
+    style Analysis fill:#f8f9fa,stroke:#495057,stroke-width:2px,color:#212529
+```
+
 1. **Why did "error handling retry backoff" return no results?**
    Because the semantic embedding did not match any indexed chunks.
 
@@ -107,28 +196,56 @@ The embedding model has learned semantic relationships between words. "retry" an
 
 ### Visualizing the Gap
 
-```
-                    EMBEDDING SPACE
-    ╭────────────────────────────────────────╮
-    │                                        │
-    │   User Query                           │
-    │   "error handling retry backoff"       │
-    │              ◉                         │
-    │              │                         │
-    │              │  (conceptually related  │
-    │              │   but too far)          │
-    │              │                         │
-    │              ▼                         │
-    │                                        │
-    │          Code Chunks                   │
-    │   "func Retry(...)"  ◉                │
-    │   "RetryConfig"      ◉                │
-    │   "MaxRetries"       ◉                │
-    │                                        │
-    ╰────────────────────────────────────────╯
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#4dabf7','primaryTextColor':'#212529','primaryBorderColor':'#339af0','lineColor':'#495057','secondaryColor':'#51cf66','tertiaryColor':'#ffd43b','background':'#f8f9fa','mainBkg':'#ffffff','secondBkg':'#e9ecef','fontSize':'14px','fontFamily':'system-ui, -apple-system, sans-serif'}}}%%
+graph TD
+    subgraph EmbeddingSpace["<b>📊 Embedding Space Visualization</b>"]
+        direction TB
+        subgraph UserRegion["<b>👤 User Vocabulary Region</b>"]
+            direction TB
+            Q1["<b>Query:</b><br/><i>'error handling retry backoff'</i><br/>⚠️ Score: 0.42<br/>❌ Below threshold (0.50)"]
+            U1["<i>'error handling'</i><br/>Abstract concept"]
+            U2["<i>'backoff mechanism'</i><br/>Abstract pattern"]
+            U3["<i>'retry logic'</i><br/>Abstract behavior"]
+        end
+
+        subgraph CodeRegion["<b>💻 Code Identifier Region</b>"]
+            direction TB
+            C1["<b>func Retry()</b><br/>Actual implementation<br/>✅ Concrete symbol"]
+            C2["<b>RetryConfig</b><br/>Type definition<br/>✅ Concrete type"]
+            C3["<b>MaxRetries</b><br/>Field name<br/>✅ Concrete field"]
+            C4["<b>DownloadWithRetry</b><br/>Function name<br/>✅ Concrete function"]
+        end
+
+        subgraph Gap["<b>⚠️ Vocabulary Gap Zone</b>"]
+            direction TB
+            G["<b>❌ Distance too large</b><br/>Similarity < 0.50<br/>No results returned<br/><i>Conceptually related but<br/>embeddings far apart</i>"]
+        end
+
+        Q1 -.->|"Semantic distance<br/>insufficient"| G
+        G -.->|"Missing connection"| C1
+        U1 -.-|weak| G
+        U2 -.-|weak| G
+        U3 -.-|weak| G
+    end
+
+    style EmbeddingSpace fill:#f8f9fa,stroke:#495057,stroke-width:2px,color:#212529
+    style UserRegion fill:#fff5f5,stroke:#ff6b6b,stroke-width:2px,color:#c92a2a
+    style CodeRegion fill:#f3faf7,stroke:#51cf66,stroke-width:2px,color:#2b8a3e
+    style Gap fill:#fff3bf,stroke:#ffd43b,stroke-width:2px,color:#f08c00
+
+    style Q1 fill:#ffe3e3,stroke:#ff6b6b,stroke-width:3px,color:#c92a2a
+    style U1 fill:#ffffff,stroke:#ff8787,stroke-width:2px,color:#c92a2a
+    style U2 fill:#ffffff,stroke:#ff8787,stroke-width:2px,color:#c92a2a
+    style U3 fill:#ffffff,stroke:#ff8787,stroke-width:2px,color:#c92a2a
+    style C1 fill:#d3f9d8,stroke:#51cf66,stroke-width:3px,color:#2b8a3e
+    style C2 fill:#ffffff,stroke:#69db7c,stroke-width:2px,color:#2b8a3e
+    style C3 fill:#ffffff,stroke:#69db7c,stroke-width:2px,color:#2b8a3e
+    style C4 fill:#ffffff,stroke:#69db7c,stroke-width:2px,color:#2b8a3e
+    style G fill:#ffd43b,stroke:#fab005,stroke-width:3px,color:#f08c00
 ```
 
-The query vector and code vectors land in related but distinct regions. The similarity score falls below the threshold for retrieval.
+The query vector and code vectors land in related but distinct regions. The similarity score (0.42) falls below the threshold (0.50) for retrieval, causing zero results.
 
 ---
 
@@ -398,6 +515,7 @@ Result:
 ### Why the Difference?
 
 The successful queries use terms that appear as code symbols:
+
 - `Retry` - function name
 - `executes` - appears in doc comment
 - `exponential` - appears in doc comment
@@ -406,6 +524,7 @@ The successful queries use terms that appear as code symbols:
 - `InitialDelay` - field name
 
 The failed query uses terms that do not appear as symbols:
+
 - "error handling" - concept, not identifier
 - "backoff" - only in comment prose
 
@@ -416,9 +535,3 @@ The failed query uses terms that do not appear as symbols:
 - [Contextual Retrieval Decision](./contextual-retrieval-decision.md) - Solution #1: Add semantic context at index time
 - [Query Expansion Asymmetric](./query-expansion-asymmetric.md) - Solution #2: Expand BM25 queries with synonyms
 - [Hybrid Search Concepts](../concepts/hybrid-search.md) - Why combining BM25 + vector helps
-
----
-
-**Original Source:** `.aman-pm/postmortems/RCA-010` (internal)
-**Status:** Resolved - led to ADR-033 and ADR-034
-**Last Updated:** 2026-01-16

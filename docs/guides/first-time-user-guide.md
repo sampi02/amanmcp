@@ -91,6 +91,44 @@ Follow these steps in order for the best experience.
 
 Choose the option appropriate for your platform:
 
+```mermaid
+flowchart TD
+    Start([Choose Embedding Backend]) --> Platform{What's your platform?}
+
+    Platform -->|Apple Silicon<br/>M1/M2/M3/M4| AppleSilicon[Apple Silicon Path]
+    Platform -->|Intel Mac or Linux| NonApple[Non-Apple Silicon Path]
+
+    AppleSilicon --> Python{Have Python 3.9+?}
+    Python -->|Yes| MLXRecommended[✅ Use MLX Server<br/>~1.7x faster]
+    Python -->|No| InstallPython[Install Python 3.9+]
+    InstallPython --> MLXRecommended
+
+    MLXRecommended --> MLXSteps[1. Clone repo<br/>2. Setup venv<br/>3. pip install -r requirements.txt<br/>4. python server.py]
+    MLXSteps --> MLXDownload[First run: Downloads 4.5GB model<br/>5-15 minutes once]
+    MLXDownload --> MLXVerify{Verify: curl localhost:9659/health}
+    MLXVerify -->|Healthy| MLXDone([MLX Ready - Skip to Step 3])
+    MLXVerify -->|Failed| MLXTrouble[See MLX Troubleshooting]
+
+    NonApple --> OllamaPath[Use Ollama]
+    OllamaPath --> OllamaSteps[1. brew install ollama<br/>2. ollama serve<br/>3. ollama pull qwen3-embedding:0.6b]
+    OllamaSteps --> OllamaVerify{Verify: ollama list}
+    OllamaVerify -->|Model listed| OllamaDone([Ollama Ready - Continue to Step 3])
+    OllamaVerify -->|Failed| OllamaTrouble[See Ollama Troubleshooting]
+
+    MLXTrouble --> Fallback[Fallback: Use Ollama instead]
+    Fallback --> OllamaSteps
+
+    style MLXRecommended fill:#90EE90
+    style MLXDone fill:#90EE90
+    style OllamaDone fill:#87CEEB
+    style MLXTrouble fill:#FFB6C1
+    style OllamaTrouble fill:#FFB6C1
+```
+
+---
+
+### Step 1 Details
+
 #### Option A: MLX Server (Apple Silicon - Default)
 
 MLX is the **default on Apple Silicon** (M1/M2/M3/M4), providing **~1.7x faster** embeddings than Ollama.
@@ -113,6 +151,7 @@ python server.py
 > **First run:** Downloads the embedding model (~4.5GB for 8B). This takes 5-15 minutes once.
 
 **Verify MLX is running:**
+
 ```bash
 curl http://localhost:9659/health
 ```
@@ -218,6 +257,7 @@ For systems without internet access or manual control:
    - Linux ARM: `amanmcp_X.X.X_linux_arm64.tar.gz`
 
 2. **Extract and install** (no sudo required):
+
 ```bash
 tar -xzf amanmcp_*.tar.gz
 mkdir -p ~/.local/bin
@@ -225,7 +265,8 @@ cp amanmcp ~/.local/bin/
 chmod +x ~/.local/bin/amanmcp
 ```
 
-3. **Configure PATH** (add to `~/.zshrc` or `~/.bashrc`):
+1. **Configure PATH** (add to `~/.zshrc` or `~/.bashrc`):
+
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
@@ -302,7 +343,7 @@ Restart VS Code with Claude Code extension to activate the MCP server.
 - Press `Cmd+Shift+P` and select "Developer: Reload Window"
 - Or simply close and reopen VS Code
 
-### Step 7: Test It!
+### Step 7: Test It
 
 In Claude Code, ask a question about your codebase:
 
@@ -340,25 +381,22 @@ amanmcp init --offline
 
 ## How It Works
 
-```
-Your Project                    AmanMCP                      AI Assistant
-     │                              │                              │
-     │  1. Scans files              │                              │
-     │ ◄────────────────────────────│                              │
-     │                              │                              │
-     │  2. Creates smart chunks     │                              │
-     │  (preserves functions,       │                              │
-     │   classes, documentation)    │                              │
-     │                              │                              │
-     │  3. Builds search index      │                              │
-     │  (keyword + semantic)        │                              │
-     │                              │                              │
-     │                              │  4. "Find auth code"         │
-     │                              │ ◄─────────────────────────────│
-     │                              │                              │
-     │                              │  5. Returns relevant code    │
-     │                              │ ─────────────────────────────►│
-     │                              │                              │
+```mermaid
+sequenceDiagram
+    participant Project as Your Project
+    participant AmanMCP as AmanMCP
+    participant AI as AI Assistant
+
+    Note over AmanMCP: Indexing Phase
+    AmanMCP->>Project: 1. Scans files
+    Project-->>AmanMCP: Returns file contents
+    Note over AmanMCP: 2. Creates smart chunks<br/>(preserves functions,<br/>classes, documentation)
+    Note over AmanMCP: 3. Builds search index<br/>(BM25 + semantic vectors)
+
+    Note over AI,AmanMCP: Query Phase
+    AI->>AmanMCP: 4. "Find auth code"
+    Note over AmanMCP: Hybrid search:<br/>BM25 + Vector + RRF
+    AmanMCP-->>AI: 5. Returns relevant code<br/>with context
 ```
 
 ---
@@ -400,6 +438,70 @@ amanmcp doctor
 ---
 
 ## Troubleshooting
+
+```mermaid
+flowchart TD
+    Start([Issue?]) --> Category{What's wrong?}
+
+    Category -->|Installation| Install{Symptom?}
+    Category -->|Runtime| Runtime{Symptom?}
+    Category -->|Performance| Perf{Symptom?}
+
+    Install -->|command not found| PATH[Fix PATH:<br/>export PATH=$HOME/.local/bin:$PATH<br/>source ~/.zshrc]
+    Install -->|zsh: killed| Gatekeeper[Remove extended attributes:<br/>xattr -cr ~/.local/bin/amanmcp]
+    Install -->|Permission denied| Perms[Fix permissions:<br/>chmod +x ~/.local/bin/amanmcp]
+
+    Runtime -->|Ollama connection| OllamaCheck{Is Ollama running?}
+    Runtime -->|MLX connection| MLXCheck{Is MLX server running?}
+    Runtime -->|Indexing interrupted| Resume[Use --resume flag:<br/>amanmcp init --resume]
+
+    OllamaCheck -->|No| StartOllama[Start Ollama:<br/>ollama serve]
+    OllamaCheck -->|Yes| OllamaModel{Model pulled?}
+    OllamaModel -->|No| PullModel[Pull model:<br/>ollama pull qwen3-embedding:0.6b]
+    OllamaModel -->|Yes| CheckPort[Check port 11434:<br/>curl localhost:11434/api/tags]
+
+    MLXCheck -->|No| StartMLX[Start MLX:<br/>cd mlx-server<br/>source .venv/bin/activate<br/>python server.py]
+    MLXCheck -->|Yes| MLXHealth{Health check passes?}
+    MLXHealth -->|No| MLXPort[Check port 9659:<br/>lsof -i :9659]
+    MLXHealth -->|Yes| MLXDone([MLX OK])
+
+    MLXPort --> PortBusy{Port in use?}
+    PortBusy -->|Yes| KillPort[Kill process:<br/>kill -9 PID]
+    PortBusy -->|No| MLXLogs[Check logs:<br/>tail -f /tmp/amanmcp-mlx-server.err]
+
+    Perf -->|Slow indexing| PerfFix[1. Close other apps<br/>2. Use --offline flag<br/>3. Check disk space<br/>4. Run 'amanmcp doctor']
+    Perf -->|Out of memory| MemFix[1. Close other apps<br/>2. Add exclusions to .amanmcp.yaml<br/>3. Use --offline mode<br/>4. Need more RAM]
+    Perf -->|System sluggish| Resource[Check resources:<br/>htop or asitop]
+
+    PATH --> Verify{Works now?}
+    Gatekeeper --> Verify
+    Perms --> Verify
+    StartOllama --> OllamaModel
+    PullModel --> CheckPort
+    CheckPort --> Verify
+    StartMLX --> MLXHealth
+    KillPort --> StartMLX
+    MLXLogs --> Debug[Run 'amanmcp doctor'<br/>Report issue on GitHub]
+    PerfFix --> Verify
+    MemFix --> Verify
+    Resource --> Verify
+    Resume --> Verify
+
+    Verify -->|Yes| Success([Fixed!])
+    Verify -->|No| Doctor[Run 'amanmcp doctor'<br/>for detailed diagnostics]
+    Doctor --> StillFailed{Still failing?}
+    StillFailed -->|Yes| Report[Report issue on GitHub:<br/>Include doctor output,<br/>version, system specs]
+    StillFailed -->|No| Success
+
+    style Success fill:#90EE90
+    style MLXDone fill:#90EE90
+    style Report fill:#FFB6C1
+    style Doctor fill:#FFE4B5
+```
+
+---
+
+### Common Issues
 
 ### "zsh: killed" Error (macOS)
 
@@ -709,7 +811,7 @@ This checks:
 
 If you're stuck, open an issue:
 
-**GitHub:** https://github.com/Aman-CERP/amanmcp/issues
+**GitHub:** <https://github.com/Aman-CERP/amanmcp/issues>
 
 Include:
 
@@ -730,30 +832,3 @@ Now that you're set up:
 4. **Read the full documentation** - See [README.md](../../README.md) for advanced features
 
 Happy coding!
-
----
-
-## Appendix: Directory Structure
-
-After installation, AmanMCP uses this structure:
-
-```
-INSTALLATION (user-scope):
-~/.local/
-└── bin/
-    └── amanmcp                     # Binary
-
-USER DATA (global):
-~/.amanmcp/
-└── sessions/                       # Optional named sessions
-
-PROJECT DATA (per-project):
-<project>/.amanmcp/
-├── metadata.db                     # SQLite metadata
-├── bm25.db                         # SQLite FTS5 BM25 index
-└── vectors.hnsw                    # Vector embeddings (coder/hnsw)
-```
-
----
-
-*Last updated: 2026-01-05*

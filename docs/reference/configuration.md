@@ -2,9 +2,6 @@
 
 Complete reference for all AmanMCP configuration options.
 
-**Version:** 0.7.1
-**Last Updated:** 2026-01-14
-
 ---
 
 ## Configuration Hierarchy
@@ -18,7 +15,32 @@ Configuration is loaded in order of increasing precedence:
 | Project Config | `.amanmcp.yaml` in project root | Project-specific |
 | Environment | `AMANMCP_*` variables | Process-wide |
 
+```mermaid
+graph TD
+    A[Application Start] --> B[Load Defaults]
+    B --> C{User Config Exists?}
+    C -->|Yes| D[Merge User Config<br/>~/.config/amanmcp/config.yaml]
+    C -->|No| E[Use Defaults]
+    D --> F{Project Config Exists?}
+    E --> F
+    F -->|Yes| G[Merge Project Config<br/>.amanmcp.yaml]
+    F -->|No| H[Current Config]
+    G --> I{Environment Variables Set?}
+    H --> I
+    I -->|Yes| J[Override with AMANMCP_* vars]
+    I -->|No| K[Final Configuration]
+    J --> K
+
+    style A fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+    style K fill:#d4edda,stroke:#28a745,stroke-width:2px
+    style B fill:#fff3cd,stroke:#ffc107,stroke-width:2px
+    style D fill:#fff3cd,stroke:#ffc107,stroke-width:2px
+    style G fill:#fff3cd,stroke:#ffc107,stroke-width:2px
+    style J fill:#fff3cd,stroke:#ffc107,stroke-width:2px
+```
+
 **Commands:**
+
 ```bash
 amanmcp config init          # Create user config
 amanmcp config init --force  # Upgrade config (backup + merge new defaults)
@@ -44,6 +66,41 @@ When you run `amanmcp init`, a `.amanmcp.yaml` file is automatically created in 
 3. **Implementation:** See `cmd/amanmcp/cmd/init.go` → `generateAmanmcpYAML()` function for the auto-generation logic.
 
 4. **Template Content:** The generated file contains commented examples for all configuration options. Users uncomment only what they need—default values work out of the box.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI as amanmcp init
+    participant Embed as configs/embed.go
+    participant FS as File System
+    participant Config as internal/config
+
+    User->>CLI: Run 'amanmcp init'
+    CLI->>FS: Check for .amanmcp.yaml
+    FS-->>CLI: File exists?
+
+    alt File exists
+        CLI->>User: ✓ Config already exists, preserving
+    else File does not exist
+        CLI->>FS: Check for .amanmcp.yml
+        FS-->>CLI: File exists?
+
+        alt .yml exists
+            CLI->>User: ✓ Config already exists (.yml), preserving
+        else No config file
+            CLI->>Embed: Read project-config.example.yaml
+            Embed-->>CLI: Template content (//go:embed)
+            CLI->>FS: Write .amanmcp.yaml
+            FS-->>CLI: File created
+            CLI->>User: ✓ Created .amanmcp.yaml
+            CLI->>Config: Validate generated config
+            Config-->>CLI: Validation result
+            CLI->>User: Configuration ready
+        end
+    end
+
+    Note over CLI,User: Template contains commented<br/>examples for all options
+```
 
 ### Source Files
 
@@ -81,6 +138,7 @@ Controls which files are indexed for semantic search.
 | `paths.exclude` | []string | See below | Glob patterns to exclude (merged with defaults) |
 
 **Default Exclude Patterns:**
+
 ```yaml
 - "**/node_modules/**"
 - "**/.git/**"
@@ -116,6 +174,7 @@ paths:
 ```
 
 **Why this matters:** PM documentation often contains:
+
 - Code examples and snippets
 - Implementation notes with function signatures
 - Technical specifications
@@ -123,6 +182,7 @@ paths:
 BM25 keyword search cannot distinguish "documentation about code" from "actual code." When PM docs mention search-related terms more frequently than actual implementations, they rank higher. Excluding these directories ensures search results prioritize real source code.
 
 **Example:**
+
 ```yaml
 paths:
   include:
@@ -149,6 +209,7 @@ Configures hybrid search behavior.
 | `search.max_results` | int | `20` | 1-1000 | Max results per query | - |
 
 **Notes:**
+
 - Weights should sum to 1.0 for proper RRF fusion
 - Default weights favor BM25 (0.65) for code search (RCA-015)
 - RRF constant k=60 is industry standard (Azure AI Search, OpenSearch)
@@ -188,6 +249,41 @@ MLX provides ~55x faster embeddings on Apple Silicon. The MLX server is bundled 
 | `medium` | Qwen3-Embedding-4B-4bit | 2560 | ~2.5GB | ~43ms |
 | `large` | Qwen3-Embedding-8B-4bit | 4096 | ~4.5GB | ~60ms |
 
+```mermaid
+graph LR
+    subgraph Model Comparison Matrix
+        A[Model Selection] --> B{Use Case}
+
+        B -->|Laptop/Limited RAM| C[small<br/>Qwen3-0.6B-4bit]
+        B -->|Balanced| D[medium<br/>Qwen3-4B-4bit]
+        B -->|Desktop/Max Quality| E[large<br/>Qwen3-8B-4bit]
+
+        C --> C1[1024 dims<br/>~900MB RAM<br/>~30ms/batch]
+        D --> D1[2560 dims<br/>~2.5GB RAM<br/>~43ms/batch]
+        E --> E1[4096 dims<br/>~4.5GB RAM<br/>~60ms/batch]
+
+        C1 --> F{Quality vs Speed}
+        D1 --> F
+        D1 --> F
+        E1 --> F
+
+        F -->|Speed Priority| G[✓ small]
+        F -->|Balanced| H[✓ medium<br/>Recommended]
+        F -->|Quality Priority| I[✓ large]
+    end
+
+    style C fill:#d4edda,stroke:#28a745,stroke-width:2px
+    style D fill:#cfe2ff,stroke:#0d6efd,stroke-width:3px
+    style E fill:#fff3cd,stroke:#ffc107,stroke-width:2px
+    style H fill:#cfe2ff,stroke:#0d6efd,stroke-width:3px
+```
+
+**Selection Guide:**
+
+- **small**: Laptops with <8GB RAM, speed-critical workflows
+- **medium**: Default choice for most users (best balance)
+- **large**: Desktops with >16GB RAM, quality-critical applications
+
 Models are stored in `~/.amanmcp/models/mlx/` (configurable via `AMANMCP_MLX_MODELS_DIR`).
 
 ### Ollama Settings (Fallback)
@@ -207,12 +303,46 @@ Settings for sustained GPU workloads (Apple Silicon). See [Thermal Management Gu
 | `embeddings.retry_timeout_multiplier` | float64 | `1.0` | 1.0-2.0 | Timeout multiplier per retry |
 
 **Timeout Calculation:**
+
 ```
 timeout = base_timeout × min(progression^(batch/31.25), 3.0) × final_batch_boost
 ```
 
 For a 10K chunk codebase at 99% completion:
+
 - Base: 60s → With progression: 180s → With final boost: 270s
+
+```mermaid
+gantt
+    title Thermal Timeout Progression (10K Chunk Indexing)
+    dateFormat X
+    axisFormat %Lms
+
+    section Batch 0-1K
+    60s timeout (base) :0, 60000
+
+    section Batch 3K
+    90s timeout :0, 90000
+
+    section Batch 5K
+    120s timeout :0, 120000
+
+    section Batch 7K
+    150s timeout :0, 150000
+
+    section Batch 9K
+    180s timeout (capped) :0, 180000
+
+    section Batch 9.9K
+    270s timeout (final boost) :crit, 0, 270000
+```
+
+**Visual Timeline:**
+
+- Early batches (0-33%): Short timeouts, GPU cool
+- Mid batches (33-66%): Progressive increase as GPU warms
+- Late batches (66-99%): Max timeout (3x base), managing thermal throttling
+- Final batch (>99%): Extra boost (1.5x max) for completion
 
 ---
 
@@ -231,6 +361,7 @@ Configures resource usage and optimization.
 | `performance.sqlite_cache_mb` | int | `64` | SQLite cache size in MB |
 
 **Performance Targets:**
+
 - Query latency: <100ms
 - Memory usage: <300MB
 - Startup time: <2s
@@ -261,6 +392,7 @@ Configures git submodule discovery (opt-in).
 | `submodules.exclude` | []string | `[]` | Submodules to exclude |
 
 **Example:**
+
 ```yaml
 submodules:
   enabled: true
@@ -308,6 +440,62 @@ Configures session management.
 | `server.transport` | `stdio`, `sse` | "must be 'stdio' or 'sse'" |
 | `server.log_level` | `debug`, `info`, `warn`, `error` | "must be one of..." |
 
+```mermaid
+flowchart TD
+    Start([Load Configuration]) --> Parse{Parse YAML}
+
+    Parse -->|Success| ValidateVersion{version == 1?}
+    Parse -->|Error| ErrorSyntax[❌ YAML Syntax Error]
+
+    ValidateVersion -->|Yes| ValidateFields[Validate Fields]
+    ValidateVersion -->|No| ErrorVersion[❌ Unsupported Version]
+
+    ValidateFields --> CheckWeights{Weights Valid?<br/>0.0 ≤ x ≤ 1.0}
+    CheckWeights -->|No| ErrorWeights[❌ Invalid Weights]
+    CheckWeights -->|Yes| CheckProvider
+
+    CheckProvider{Provider Valid?<br/>mlx/ollama/static/auto} -->|No| ErrorProvider[❌ Invalid Provider]
+    CheckProvider -->|Yes| CheckTransport
+
+    CheckTransport{Transport Valid?<br/>stdio/sse} -->|No| ErrorTransport[❌ Invalid Transport]
+    CheckTransport -->|Yes| CheckLogLevel
+
+    CheckLogLevel{Log Level Valid?<br/>debug/info/warn/error} -->|No| ErrorLogLevel[❌ Invalid Log Level]
+    CheckLogLevel -->|Yes| CheckRanges
+
+    CheckRanges{Numeric Ranges OK?<br/>ports, timeouts, etc.} -->|No| ErrorRanges[❌ Out of Range]
+    CheckRanges -->|Yes| MergeDefaults
+
+    MergeDefaults[Merge with Defaults] --> ApplyEnv[Apply Environment Overrides]
+    ApplyEnv --> Success([✓ Valid Configuration])
+
+    ErrorSyntax --> Fail([Configuration Failed])
+    ErrorVersion --> Fail
+    ErrorWeights --> Fail
+    ErrorProvider --> Fail
+    ErrorTransport --> Fail
+    ErrorLogLevel --> Fail
+    ErrorRanges --> Fail
+
+    style Start fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+    style Success fill:#d4edda,stroke:#28a745,stroke-width:2px
+    style Fail fill:#f8d7da,stroke:#dc3545,stroke-width:2px
+    style ErrorSyntax fill:#f8d7da,stroke:#dc3545
+    style ErrorVersion fill:#f8d7da,stroke:#dc3545
+    style ErrorWeights fill:#f8d7da,stroke:#dc3545
+    style ErrorProvider fill:#f8d7da,stroke:#dc3545
+    style ErrorTransport fill:#f8d7da,stroke:#dc3545
+    style ErrorLogLevel fill:#f8d7da,stroke:#dc3545
+    style ErrorRanges fill:#f8d7da,stroke:#dc3545
+```
+
+**Validation Behavior:**
+
+- **Early Exit:** Validation stops at first error, displays clear message
+- **Zero Values:** Empty/zero values use defaults (not treated as invalid)
+- **Environment Override:** Applied AFTER validation (can override invalid config values)
+- **Merge Safety:** Array merging (paths.exclude) cannot create invalid state
+
 ---
 
 ## Merge Behavior
@@ -325,11 +513,13 @@ When multiple configs exist:
 ## Example Configurations
 
 ### Minimal (All Defaults)
+
 ```yaml
 version: 1
 ```
 
 ### User Config with MLX (Apple Silicon - Recommended)
+
 ```yaml
 version: 1
 
@@ -343,6 +533,7 @@ server:
 ```
 
 ### User Config with Ollama (Universal Fallback)
+
 ```yaml
 version: 1
 
@@ -357,6 +548,7 @@ server:
 ```
 
 ### Project Config
+
 ```yaml
 version: 1
 

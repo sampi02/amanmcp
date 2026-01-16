@@ -155,7 +155,7 @@ amanmcp/
 
 | Area | Description | Skills Needed |
 |------|-------------|---------------|
-| **Documentation** | Improve guides, examples | Writing |
+| **Documentation** | Improve guides, examples, diagrams | Writing, Mermaid |
 | **Testing** | Increase coverage | Go testing |
 | **CI/CD** | Improve release process | GitHub Actions |
 
@@ -236,6 +236,53 @@ testdata/
 ### 4. Update Documentation
 
 Add the language to `README.md` supported languages table.
+
+---
+
+## Documentation Contributions
+
+### Improving Documentation
+
+Documentation improvements are highly valued! We welcome:
+
+- **Clarifications** - Make complex concepts easier to understand
+- **Examples** - Add practical code examples
+- **Diagrams** - Visualize processes and architectures
+- **Guides** - Step-by-step tutorials for common tasks
+- **Fixes** - Typos, broken links, outdated information
+
+### Adding Diagrams
+
+We use [Mermaid](https://mermaid.js.org/) for all documentation diagrams (260+ across the codebase).
+
+**Quick Start:**
+1. **Read:** [Diagram Standards](docs/contributing/diagram-standards.md) - Full quality guidelines
+2. **Reference:** [Diagram Quick Reference](docs/contributing/DIAGRAM_QUICK_REFERENCE.md) - Color palette & templates
+3. **Examples:** See `docs/reference/architecture-patterns.md` for excellent diagrams
+
+**5-Second Checklist:**
+- [ ] Uses [standard color palette](docs/contributing/DIAGRAM_QUICK_REFERENCE.md#color-palette-copy-paste-ready)
+- [ ] Clarifies better than text alone
+- [ ] Self-contained and labeled
+- [ ] Renders in GitHub preview
+- [ ] Less than 20 nodes
+
+**Color Palette:**
+```
+Green (#27ae60, #c8e6c9) → Success, good patterns
+Blue (#3498db, #e1f5ff) → Info, process
+Orange (#f39c12, #ffe0b2) → Warning, intermediate
+Red (#e74c3c, #ffccbc) → Error, bad patterns
+```
+
+**When to add diagrams:**
+- Architecture changes
+- Complex workflows
+- Decision processes
+- Troubleshooting flows
+- Before/after comparisons
+
+See [diagram-standards.md](docs/contributing/diagram-standards.md) for complete templates and guidelines.
 
 ---
 

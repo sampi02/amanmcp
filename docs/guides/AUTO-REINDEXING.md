@@ -8,56 +8,21 @@ AmanMCP uses a **real-time file watcher** combined with **startup reconciliation
 
 ## How It Works: The Complete Flow
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                     FILE SYSTEM CHANGE                               │
-│                   (create/modify/delete)                             │
-└───────────────────────────┬─────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                    HYBRID WATCHER                                    │
-│  • Primary: fsnotify (real-time OS events)                          │
-│  • Fallback: Polling (5s interval, for Docker/NFS)                  │
-│  Location: internal/watcher/hybrid.go:20-489                        │
-└───────────────────────────┬─────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                    .gitignore FILTER                                 │
-│  • Respects .gitignore patterns (nested + root)                     │
-│  • Excludes archive/, node_modules/, .git/                          │
-│  Location: internal/watcher/hybrid.go:329-348                       │
-└───────────────────────────┬─────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                    DEBOUNCER (200ms)                                 │
-│  • Coalesces rapid changes to prevent thrashing                     │
-│  • Smart rules: CREATE+DELETE=nothing, MODIFY+DELETE=DELETE         │
-│  Location: internal/watcher/debouncer.go:79-124                     │
-└───────────────────────────┬─────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                    COORDINATOR                                       │
-│  • Receives batched events, routes to handlers                      │
-│  • OpCreate/OpModify → indexFile()                                  │
-│  • OpDelete → removeFile()                                          │
-│  • OpGitignoreChange → handleGitignoreChange()                      │
-│  Location: internal/index/coordinator.go:82-127                     │
-└───────────────────────────┬─────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                    INDEX UPDATE                                      │
-│  1. Chunk file (tree-sitter for code, headers for markdown)         │
-│  2. Generate embeddings (Ollama or Static768 fallback)              │
-│  3. Update BM25 index (keyword search)                              │
-│  4. Update HNSW vector store (semantic search)                      │
-│  5. Update SQLite metadata                                          │
-│  Location: internal/index/coordinator.go:129-248                    │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A["FILE SYSTEM CHANGE<br/>(create/modify/delete)"] --> B
+    B["HYBRID WATCHER<br/>• Primary: fsnotify (real-time OS events)<br/>• Fallback: Polling (5s interval, Docker/NFS)<br/>Location: internal/watcher/hybrid.go:20-489"] --> C
+    C[".gitignore FILTER<br/>• Respects .gitignore patterns (nested + root)<br/>• Excludes archive/, node_modules/, .git/<br/>Location: internal/watcher/hybrid.go:329-348"] --> D
+    D["DEBOUNCER (200ms)<br/>• Coalesces rapid changes to prevent thrashing<br/>• Smart rules: CREATE+DELETE=nothing<br/>Location: internal/watcher/debouncer.go:79-124"] --> E
+    E["COORDINATOR<br/>• Receives batched events, routes to handlers<br/>• OpCreate/OpModify → indexFile()<br/>• OpDelete → removeFile()<br/>Location: internal/index/coordinator.go:82-127"] --> F
+    F["INDEX UPDATE<br/>1. Chunk file (tree-sitter/headers)<br/>2. Generate embeddings (Ollama/Static768)<br/>3. Update BM25 index<br/>4. Update HNSW vector store<br/>5. Update SQLite metadata<br/>Location: internal/index/coordinator.go:129-248"]
+
+    style A fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    style B fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style C fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    style D fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    style E fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style F fill:#fce4ec,stroke:#880e4f,stroke-width:2px
 ```
 
 ---
@@ -97,6 +62,36 @@ AmanMCP uses a **real-time file watcher** combined with **startup reconciliation
   DELETE + CREATE = MODIFY (file replaced)
   ```
 - Emits batched events to the Coordinator
+
+**State Machine:**
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle: Debouncer started
+    Idle --> Pending: First event received
+    Pending --> Debouncing: Timer started (200ms)
+    Debouncing --> Debouncing: More events received<br/>(reset timer)
+    Debouncing --> Executing: Timer expired
+    Executing --> Idle: Events sent to Coordinator
+
+    note right of Pending
+        Event added to buffer
+        Timer not yet started
+    end note
+
+    note right of Debouncing
+        Coalescing events:
+        CREATE+DELETE=NOTHING
+        CREATE+MODIFY=CREATE
+        MODIFY+DELETE=DELETE
+        DELETE+CREATE=MODIFY
+    end note
+
+    note right of Executing
+        Batched events emitted
+        Buffer cleared
+    end note
+```
 
 ### 3. Coordinator (`internal/index/coordinator.go`)
 
@@ -157,6 +152,63 @@ When the MCP server starts, it detects changes made while it was stopped:
   - **Added**: On disk but not in index
 - Processes changes deterministically: deletions → modifications → additions
 
+### Decision Tree: Startup Reconciliation
+
+```mermaid
+flowchart TD
+    Start([Server Startup]) --> A{Compute .gitignore<br/>SHA256 hash}
+    A --> B{Hash changed?}
+    B -->|No| E[Skip gitignore reconciliation]
+    B -->|Yes| C{Which .gitignore<br/>changed?}
+
+    C -->|Nested| D1[Scan affected subtree only]
+    C -->|Root + patterns added| D2[Filter indexed files<br/>No filesystem scan]
+    C -->|Root + patterns removed| D3[Full filesystem scan<br/>Find newly-unignored files]
+
+    D1 --> F
+    D2 --> F
+    D3 --> F
+    E --> F
+
+    F[Update cached gitignore hash] --> G{Get all indexed files<br/>with mtime + size}
+    G --> H[Scan current filesystem]
+    H --> I{Compare index vs disk}
+
+    I --> J{File in index<br/>but not on disk?}
+    J -->|Yes| K[Mark for deletion]
+    J -->|No| L
+
+    I --> L{mtime or size<br/>changed?}
+    L -->|Yes| M[Mark for reindexing]
+    L -->|No| N
+
+    I --> N{File on disk<br/>but not in index?}
+    N -->|Yes| O[Mark for addition]
+    N -->|No| P
+
+    K --> Q[Process deletions]
+    M --> R[Process modifications]
+    O --> S[Process additions]
+
+    Q --> R
+    R --> S
+    S --> T[Start file watcher]
+    P --> T
+    T --> End([Ready for MCP requests])
+
+    style Start fill:#e1f5ff,stroke:#01579b,stroke-width:3px
+    style End fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    style B fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style C fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style I fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style J fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    style L fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    style N fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    style K fill:#ffcdd2,stroke:#c62828,stroke-width:2px
+    style M fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    style O fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+```
+
 ---
 
 ## Tracking Methods
@@ -202,6 +254,61 @@ Based on the architecture:
 - Startup reconciliation detects your file changes via mtime/size comparison
 - Processes them before the watcher starts listening
 
+### Sequence Diagram: File System Change Flow
+
+```mermaid
+sequenceDiagram
+    participant FS as File System
+    participant FSN as fsnotify
+    participant GI as .gitignore Filter
+    participant DB as Debouncer
+    participant CO as Coordinator
+    participant IDX as Index Stores<br/>(BM25/HNSW/SQLite)
+
+    Note over FS: User saves file.go
+    FS->>FSN: Write event
+    Note over FSN: t=0ms
+    FSN->>GI: Event: OpModify file.go
+
+    GI->>GI: Check .gitignore patterns
+    alt File ignored
+        GI-->>FSN: Drop event
+    else File not ignored
+        GI->>DB: Forward event
+    end
+
+    Note over DB: t=0ms<br/>Start 200ms timer
+    DB->>DB: Add to buffer
+
+    Note over FS: User saves again
+    FS->>FSN: Write event
+    Note over FSN: t=50ms
+    FSN->>GI: Event: OpModify file.go
+    GI->>DB: Forward event
+
+    Note over DB: t=50ms<br/>Reset timer to 200ms
+    DB->>DB: Coalesce MODIFY+MODIFY=MODIFY
+
+    Note over DB: t=250ms<br/>Timer expired
+    DB->>CO: Batched events: [OpModify file.go]
+
+    CO->>CO: Route to indexFile()
+    CO->>IDX: Remove old chunks for file.go
+    IDX-->>CO: OK
+
+    CO->>CO: Parse file with tree-sitter
+    CO->>CO: Generate embeddings (Ollama)
+
+    CO->>IDX: Add chunks to BM25
+    IDX-->>CO: OK
+    CO->>IDX: Add vectors to HNSW
+    IDX-->>CO: OK
+    CO->>IDX: Update SQLite metadata
+    IDX-->>CO: OK
+
+    Note over CO,IDX: Total time: ~200-500ms<br/>from last file save
+```
+
 ---
 
 ## Verification
@@ -219,3 +326,60 @@ amanmcp status
 Changes should be reflected in search results within ~200-500ms of saving a file.
 
 The "Last indexed" timestamp in `amanmcp status` is updated after every incremental update when the MCP server is running.
+
+---
+
+## Auto-Reindexing Operational Guide
+
+```mermaid
+flowchart TB
+    subgraph Operation["Auto-Reindexing: What Happens When"]
+        direction TB
+
+        subgraph Startup["Server Startup (amanmcp serve)"]
+            S1["1. Load existing index from disk"]
+            S2["2. Reconcile .gitignore changes<br/>(compute SHA256 hash)"]
+            S3["3. Reconcile file changes<br/>(mtime + size comparison)"]
+            S4["4. Process deletions → modifications → additions"]
+            S5["5. Start HybridWatcher<br/>(fsnotify + polling fallback)"]
+            S6["6. MCP server ready"]
+            S1 --> S2 --> S3 --> S4 --> S5 --> S6
+        end
+
+        subgraph Runtime["During Runtime (File Changes)"]
+            R1["Developer saves file.go"]
+            R2["fsnotify detects Write event<br/>(< 1ms)"]
+            R3["Filter through .gitignore<br/>patterns"]
+            R4["Debouncer collects events<br/>(200ms window)"]
+            R5["Coordinator receives batch<br/>Routes to indexFile()"]
+            R6["Re-chunk → Embed → Update indexes<br/>(~200-500ms total)"]
+            R7["Next search sees updated content"]
+            R1 --> R2 --> R3 --> R4 --> R5 --> R6 --> R7
+        end
+
+        subgraph Special["Special Cases"]
+            SP1[".gitignore Modified:<br/>• Nested: Scan subtree only<br/>• Root + added patterns: Filter indexed files<br/>• Root + removed patterns: Full scan"]
+            SP2["Rapid Changes (same file):<br/>• Multiple saves debounced<br/>• Final state indexed once"]
+            SP3["File Renamed:<br/>• Treated as DELETE + CREATE<br/>• Debouncer coalesces to MODIFY"]
+        end
+
+        subgraph Fallback["Polling Fallback (Docker/NFS)"]
+            F1["fsnotify unreliable?<br/>Auto-detect and switch"]
+            F2["Poll every 5s:<br/>• Stat all tracked files<br/>• Compare mtime + size"]
+            F3["Process changes same as fsnotify"]
+            F1 --> F2 --> F3
+        end
+    end
+
+    Startup -.-> Runtime
+    Runtime -.-> Special
+    Runtime -.-> Fallback
+
+    style Operation fill:#f5f5f5,stroke:#757575,stroke-width:2px
+    style Startup fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    style Runtime fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style Special fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style Fallback fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    style S6 fill:#c8e6c9
+    style R7 fill:#c8e6c9
+```

@@ -26,6 +26,45 @@ This is why we're building **AmanMCP**.
 
 ---
 
+### Traditional vs. AmanMCP: The Flow Difference
+
+```mermaid
+---
+config:
+  layout: elk
+  theme: neutral
+  look: neo
+---
+flowchart TB
+    subgraph Traditional["Traditional Approach"]
+        Q1["Ask: 'How does auth work?'"]
+        G1["grep 'auth' → 50 files"]
+        R1["Read billing.go (900 lines)"]
+        R2["Read subscription.go (700 lines)"]
+        R3["Read payment_processor.go"]
+        R4["Read deprecated v1 API"]
+        W1["2000 lines, 15 needed<br/>High token cost<br/>Context overflow"]
+
+        Q1 --> G1 --> R1 --> R2 --> R3 --> R4 --> W1
+    end
+
+    subgraph AmanMCP["AmanMCP Approach"]
+        Q2["Ask: 'How does auth work?'"]
+        H1["Hybrid Search<br/>(BM25 + Vector)"]
+        P1["Return precise functions:<br/>• ValidateCredentials<br/>• AuthMiddleware<br/>• BillingAuthHook"]
+        W2["15 lines, 15 needed<br/>Minimal token cost<br/>Perfect context"]
+
+        Q2 --> H1 --> P1 --> W2
+    end
+
+    style Traditional fill:#f8d7da,stroke:#e74c3c,stroke-width:2px
+    style AmanMCP fill:#d5f4e6,stroke:#27ae60,stroke-width:2px
+    style W1 fill:#e74c3c,stroke-width:2px
+    style W2 fill:#27ae60,stroke-width:2px
+```
+
+---
+
 ## The Three Frictions
 
 The problem isn't intelligence. Modern models are brilliant. The problem is **retrieval**. Current solutions force you to choose between three frictions:
@@ -45,6 +84,38 @@ Most RAG solutions—the technology that gives AI "memory"—run in the cloud. Y
 We refused to accept these compromises. We asked a simple, radical question:
 
 *What if the AI lived on your machine, respected your privacy, and knew your code as well as you do?*
+
+```mermaid
+---
+config:
+  layout: elk
+  theme: neutral
+  look: neo
+---
+flowchart TB
+    subgraph Frictions["The Three Frictions"]
+        F1["Token Economy<br/>Reading 2000 lines<br/>to find 15"]
+        F2["Precision Gap<br/>grep finds strings<br/>not intentions"]
+        F3["Privacy Bargain<br/>Cloud RAG = Code upload<br/>Unacceptable for proprietary work"]
+    end
+
+    subgraph Solution["AmanMCP Solution"]
+        S1["✅ Hybrid Search<br/>BM25 + Vector → Perfect precision"]
+        S2["✅ AST-Aware Chunking<br/>Semantic boundaries, not arbitrary splits"]
+        S3["✅ 100% Local<br/>Your code never leaves your machine"]
+    end
+
+    F1 -.->|solves| S1
+    F2 -.->|solves| S2
+    F3 -.->|solves| S3
+
+    style F1 fill:#f39c12,stroke-width:2px
+    style F2 fill:#f39c12,stroke-width:2px
+    style F3 fill:#e74c3c,stroke-width:2px
+    style S1 fill:#27ae60,stroke-width:2px
+    style S2 fill:#27ae60,stroke-width:2px
+    style S3 fill:#27ae60,stroke-width:2px
+```
 
 ---
 
@@ -70,6 +141,33 @@ AmanMCP runs two searches in parallel:
 - **Vector search** for semantic understanding—finding conceptually related code even when keywords don't match
 
 Then it fuses the results using **Reciprocal Rank Fusion (RRF)**, a technique proven at scale by OpenSearch, Elasticsearch, and MongoDB. The result: code that matches what you typed *and* code that matches what you meant.
+
+```mermaid
+flowchart TB
+    Query["Query: 'authentication flow'"]
+
+    subgraph Parallel["Parallel Search Engines"]
+        BM25["BM25 (Lexical)<br/>Exact matches:<br/>• 'authenticate'<br/>• 'AuthMiddleware'<br/>• 'login_handler'"]
+        Vector["Vector (Semantic)<br/>Conceptual matches:<br/>• ValidateCredentials<br/>• VerifyUser<br/>• SessionManager"]
+    end
+
+    RRF["RRF Fusion (k=60)<br/>Weight: BM25 35% / Vector 65%"]
+
+    Results["Ranked Results<br/>1. AuthMiddleware (both)<br/>2. ValidateCredentials (semantic)<br/>3. login_handler (lexical)<br/>4. VerifyUser (semantic)<br/>5. SessionManager (semantic)"]
+
+    Query --> Parallel
+    BM25 --> RRF
+    Vector --> RRF
+    RRF --> Results
+
+    style Query fill:#3498db,stroke-width:2px
+    style BM25 fill:#f39c12,stroke-width:2px
+    style Vector fill:#3498db,stroke-width:2px
+    style RRF fill:#27ae60,stroke-width:2px
+    style Results fill:#27ae60,stroke-width:2px
+```
+
+**The hybrid approach delivers precision AND recall.** You get exact matches when you know the term, conceptual matches when you're exploring.
 
 ---
 
@@ -106,7 +204,35 @@ When you run `amanmcp` in your project directory:
 
 No configuration file required. No environment variables needed. No documentation necessary for the default case.
 
-The 90% of developers who just want it to work—it should just work. The 10% who want customization—the options are there, when you need them.
+```mermaid
+flowchart LR
+    Start["First-time User<br/>cd my-project"]
+    Init["amanmcp init"]
+
+    subgraph Auto["Automatic Setup"]
+        Check1["✓ Detect Ollama"]
+        Check2["✓ Pull nomic-embed-text"]
+        Check3["✓ Scan project structure"]
+        Check4["✓ Respect .gitignore"]
+        Check5["✓ Build search index"]
+    end
+
+    Ready["Ready for queries<br/>< 30 seconds"]
+    Query["Ask Claude:<br/>'Search my codebase for auth'"]
+    Result["Instant, precise results"]
+
+    Start --> Init --> Auto
+    Check1 --> Check2 --> Check3 --> Check4 --> Check5
+    Auto --> Ready --> Query --> Result
+
+    style Start fill:#3498db,stroke-width:2px
+    style Init fill:#f39c12,stroke-width:2px
+    style Auto fill:#d5f4e6,stroke:#27ae60,stroke-width:2px
+    style Ready fill:#27ae60,stroke-width:2px
+    style Result fill:#27ae60,stroke-width:2px
+```
+
+**Zero friction from install to first search.** The 90% of developers who just want it to work—it should just work. The 10% who want customization—the options are there, when you need them.
 
 ---
 

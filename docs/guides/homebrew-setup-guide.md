@@ -15,6 +15,31 @@ AmanMCP is distributed via Homebrew using a custom tap. This guide covers:
 5. Testing formulas locally
 6. Troubleshooting
 
+### Installation Workflow
+
+```mermaid
+flowchart TD
+    Start([User Wants to Install]) --> Tap[brew tap amanmcp/amanmcp]
+    Tap --> Install[brew install amanmcp]
+    Install --> Verify[amanmcp version]
+    Verify --> Success{Version<br/>Displays?}
+    Success -->|Yes| Init[amanmcp init in project]
+    Success -->|No| Troubleshoot[Check Troubleshooting]
+    Init --> Ollama{Install<br/>Ollama?}
+    Ollama -->|Yes| OllamaInstall[brew install ollama<br/>ollama pull qwen3-embedding]
+    Ollama -->|No| Done([Ready to Use])
+    OllamaInstall --> Done
+    Troubleshoot --> CheckArch[Check Architecture]
+    CheckArch --> Reinstall[brew reinstall amanmcp]
+    Reinstall --> Verify
+
+    style Start fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    style Done fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style Success fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style Ollama fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style Troubleshoot fill:#ffccbc,stroke:#d84315,stroke-width:2px
+```
+
 ---
 
 ## Part 1: One-Time Setup (Create Tap Repository)
@@ -277,6 +302,68 @@ which amanmcp
 ---
 
 ## Part 6: Troubleshooting
+
+### Troubleshooting Decision Tree
+
+```mermaid
+flowchart TD
+    Issue([Homebrew Issue]) --> Type{What's<br/>Wrong?}
+
+    Type -->|Installation Fails| Install
+    Type -->|Formula Not Updated| Formula
+    Type -->|Binary Won't Run| Binary
+    Type -->|Wrong Architecture| Arch
+
+    Install[Installation Error] --> Cache{Checksum<br/>Mismatch?}
+    Cache -->|Yes| ClearCache[brew cleanup amanmcp]
+    Cache -->|No| Reinstall[brew reinstall amanmcp]
+    ClearCache --> RetryInstall[brew install amanmcp]
+    Reinstall --> CheckLogs[brew install --verbose --debug]
+    RetryInstall --> Fixed1{Fixed?}
+    CheckLogs --> Fixed1
+    Fixed1 -->|Yes| Success([Problem Solved])
+    Fixed1 -->|No| FileIssue([File GitHub Issue])
+
+    Formula[Formula Not Updated] --> CheckToken{Token Set?}
+    CheckToken -->|No| AddToken[Add HOMEBREW_TAP_GITHUB_TOKEN]
+    CheckToken -->|Yes| CheckPerms{Correct<br/>Permissions?}
+    AddToken --> CheckPerms
+    CheckPerms -->|No| UpdatePerms[Add repo + workflow scopes]
+    CheckPerms -->|Yes| CheckLogs2[Review GoReleaser Logs]
+    UpdatePerms --> RerunRelease[Re-run Release Workflow]
+    CheckLogs2 --> RerunRelease
+    RerunRelease --> Success
+
+    Binary[Binary Won't Run] --> Gatekeeper{Gatekeeper<br/>Blocking?}
+    Gatekeeper -->|Yes| RemoveQuarantine[xattr -d com.apple.quarantine<br/>/usr/local/bin/amanmcp]
+    Gatekeeper -->|No| CheckExec{Executable<br/>Permissions?}
+    RemoveQuarantine --> TestRun[amanmcp version]
+    CheckExec -->|No| FixPerms[chmod +x /usr/local/bin/amanmcp]
+    CheckExec -->|Yes| ReinstallBinary[brew reinstall amanmcp]
+    FixPerms --> TestRun
+    ReinstallBinary --> TestRun
+    TestRun --> Success
+
+    Arch[Wrong Architecture] --> CheckSys[uname -m<br/>Check System Arch]
+    CheckSys --> CheckBin[file /usr/local/bin/amanmcp<br/>Check Binary Arch]
+    CheckBin --> Mismatch{Architectures<br/>Match?}
+    Mismatch -->|No| ForceReinstall[brew uninstall amanmcp<br/>brew install amanmcp]
+    Mismatch -->|Yes| OtherIssue[Check Other Issues]
+    ForceReinstall --> Success
+    OtherIssue --> FileIssue
+
+    style Issue fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    style Success fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style FileIssue fill:#ffccbc,stroke:#d84315,stroke-width:2px
+    style Type fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style Cache fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style CheckToken fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style CheckPerms fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style Gatekeeper fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style CheckExec fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style Mismatch fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style Fixed1 fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+```
 
 ### Formula Update Failed
 

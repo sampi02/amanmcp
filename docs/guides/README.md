@@ -4,6 +4,43 @@ Task-based guides for getting things done with AmanMCP. Each guide solves a spec
 
 ---
 
+## Guide Navigation Map
+
+```mermaid
+graph TD
+    Start([New to AmanMCP?]) --> FirstTime[First-Time User Guide]
+    Start --> Homebrew{Using<br/>Homebrew?}
+    Homebrew -->|Yes| HomebrewGuide[Homebrew Setup]
+    Homebrew -->|No| FirstTime
+
+    FirstTime --> Installed{Successfully<br/>Installed?}
+    Installed -->|Yes| Config[Configuration & Optimization]
+    Installed -->|No| Troubleshoot[Troubleshooting Section]
+
+    Config --> AppleSilicon{Have Apple<br/>Silicon Mac?}
+    AppleSilicon -->|Yes| MLXSetup[MLX Setup Guide]
+    AppleSilicon -->|No| Features[Feature Guides]
+
+    MLXSetup --> CompareBackends[Backend Switching Guide]
+    Features --> AutoReindex[Auto-Reindexing Guide]
+    Features --> Thermal[Thermal Management]
+    CompareBackends --> Features
+
+    AutoReindex --> Advanced([Ready for Advanced Use])
+    Thermal --> Advanced
+
+    style Start fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    style Advanced fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style Installed fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style AppleSilicon fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style Homebrew fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style FirstTime fill:#b3e5fc,stroke:#0277bd,stroke-width:2px
+    style Config fill:#b3e5fc,stroke:#0277bd,stroke-width:2px
+    style Features fill:#b3e5fc,stroke:#0277bd,stroke-width:2px
+```
+
+---
+
 ## Getting Started
 
 | Guide | What You'll Learn | When to Use |
@@ -37,6 +74,53 @@ Task-based guides for getting things done with AmanMCP. Each guide solves a spec
 
 ### "I want automatic updates"
 1. [Auto-Reindexing](AUTO-REINDEXING.md) - File watcher setup
+
+---
+
+## User Journey Map
+
+```mermaid
+---
+config:
+  layout: elk
+  theme: neo
+  look: handDrawn
+---
+flowchart TB
+ subgraph Beginner["Beginner (Day 1)"]
+        B1["Install AmanMCP"]
+        B2["Initialize Project"]
+        B3["First Index"]
+        B4["First Search"]
+  end
+ subgraph Intermediate["Intermediate (Week 1)"]
+        I1["Understand Backend Options"]
+        I2["Try MLX for Speed"]
+        I3["Enable Auto-Reindexing"]
+        I4["Learn Search Patterns"]
+  end
+ subgraph Advanced["Advanced (Week 2+) (Optional)"]
+        A1["Optimize Config"]
+        A2["Manage Thermal Load"]
+        A3["Switch Backends"]
+        A4["Fine-tune Exclusions"]
+  end
+    B1 --> B2
+    B2 --> B3
+    B3 --> B4
+    I1 --> I2
+    I2 --> I3
+    I3 --> I4
+    A1 --> A2
+    A2 --> A3
+    A3 --> A4
+    B4 -- 1 Week --> I1
+    I4 -- 2 Weeks --> A1
+
+    style Beginner fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    style Intermediate fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style Advanced fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+```
 
 ---
 

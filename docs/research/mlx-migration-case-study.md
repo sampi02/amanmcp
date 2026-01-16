@@ -1,11 +1,13 @@
 # MLX Migration Case Study: From 48 Minutes to 3 Minutes
 
 > **Learning Objectives:**
+>
 > - Learn how to plan performance optimization migrations
 > - Understand benchmark-driven decision making
 > - See multi-phase rollout strategy in action
 >
 > **Prerequisites:**
+>
 > - [Embedding Models](./embedding-models.md) - Background on embedding choices
 > - Basic understanding of embedding pipelines and vector search
 >
@@ -43,6 +45,7 @@ For a typical 6,500-chunk codebase, indexing took **~48 minutes**. This was unac
 ### Why Embedding Was So Slow
 
 Ollama, our default embedding backend, processes requests sequentially. Even with batch support, the overhead of:
+
 - HTTP round-trips
 - Model loading/unloading
 - CPU-bound tokenization
@@ -64,6 +67,18 @@ We benchmarked three embedding backends on M4 Pro hardware:
 | **MLX** | Works perfectly | **~60ms** | Native Apple Silicon |
 | TEI | Crashes on warm-up | N/A | Metal support incomplete |
 | Ollama | Works | ~3300ms | Sequential processing |
+
+```mermaid
+%%{init: {'theme':'base'}}%%
+graph LR
+    A[Backend Comparison] --> B[MLX: 60ms ✓]
+    A --> C[TEI: Crashes ✗]
+    A --> D[Ollama: 3300ms △]
+
+    style B fill:#90EE90
+    style C fill:#FFB6C6
+    style D fill:#FFE4B5
+```
 
 **Key Finding:** MLX delivered 55x faster batch processing. TEI was eliminated due to stability issues.
 
@@ -110,6 +125,7 @@ This ensures the application **never fails** due to embedding backend unavailabi
 **Principle: Prefer auto-detection over configuration.**
 
 Users shouldn't need to know about MLX. The system should:
+
 1. Detect Apple Silicon automatically
 2. Check if MLX endpoint is healthy
 3. Fall back to Ollama silently
@@ -136,9 +152,27 @@ AMANMCP_MLX_MODEL=large
 **Principle: Document the migration path, not just the feature.**
 
 We updated:
+
 - Changelog entry (v0.1.63)
 - CI validation
 - User setup guide (below)
+
+```mermaid
+timeline
+    title 4-Phase Migration Timeline
+    Phase 1: Validate : Benchmark MLX/TEI/Ollama
+                      : MLX 55x faster
+                      : TEI eliminated
+    Phase 2: Implement : Add MLXEmbedder
+                       : Fallback chain
+                       : Unit tests pass
+    Phase 3: Configure : Auto-detection on Apple Silicon
+                       : Config options
+                       : Environment variables
+    Phase 4: Rollout : v0.1.63 release
+                     : Documentation
+                     : CI validation
+```
 
 ---
 
@@ -185,9 +219,29 @@ type Embedder interface {
 | Query latency | ~100ms | ~100ms | Same |
 | Memory usage | ~2GB | ~5GB | +3GB |
 
+```mermaid
+---
+config:
+  themeVariables:
+    xyChart:
+      backgroundColor: transparent
+---
+xychart-beta
+    title "Performance Speedup: Ollama vs MLX"
+    x-axis ["Index Time (6,500 chunks)", "Batch Latency (32 texts)", "Query Latency", "Memory Usage"]
+    y-axis "Relative Performance" 0 --> 60
+    bar [48, 3.3, 0.1, 2]
+    bar [3, 0.06, 0.1, 5]
+```
+
+**Legend:** Blue = Ollama (Before), Orange = MLX (After)
+
+- Index time in minutes, Batch latency in seconds, Query latency in seconds, Memory in GB
+
 ### Why Query Latency Stayed the Same
 
 Query latency embeds a single text, where the overhead is dominated by:
+
 - HTTP round-trip latency
 - Model inference startup
 
@@ -206,11 +260,13 @@ We spent 2 hours benchmarking before writing a single line of production code. T
 ### 2. Always Have a Fallback
 
 MLX requires:
+
 - Apple Silicon hardware
 - External MLX server running
 - ~5GB RAM for the model
 
 Without fallback, these requirements would break the experience for:
+
 - Linux/Windows users
 - Intel Mac users
 - Users who haven't set up MLX
@@ -230,6 +286,7 @@ if cfg.Embeddings.Provider == "mlx" { ... }  // User must know to set this
 ### 4. Incremental Rollout
 
 Our phases were:
+
 1. **Validate** - Benchmarks only, no code changes
 2. **Implement** - Code with tests, not documented
 3. **Document** - User-facing documentation
@@ -315,6 +372,7 @@ For automatic startup, create `~/Library/LaunchAgents/com.amanmcp.mlx-embed.plis
 ```
 
 Enable with:
+
 ```bash
 launchctl load ~/Library/LaunchAgents/com.amanmcp.mlx-embed.plist
 ```
@@ -361,9 +419,3 @@ amanmcp search "OllamaEmbedder" --debug
 
 - [Embedding Models](./embedding-models.md) - Full model comparison and benchmarks
 - [SQLite FTS5 vs Bleve](./sqlite-vs-bleve.md) - Another migration case study
-
----
-
-**Original Source:** `archive/plans/mlx-implementation-plan.md`
-**Status:** Completed case study
-**Last Updated:** 2026-01-16

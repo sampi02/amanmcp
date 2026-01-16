@@ -4,6 +4,53 @@ This section documents the research and analysis behind AmanMCP's technical choi
 
 **Audience**: Developers, researchers, and contributors who want to understand the "why" behind technical choices.
 
+```mermaid
+graph TD
+    subgraph "Search & Retrieval"
+        R1[Contextual Retrieval]
+        R2[Query Expansion]
+        R3[RRF Fusion]
+        R4[Vocabulary Mismatch]
+        R5[Dogfooding Method]
+        R6[Quality Series]
+    end
+
+    subgraph "Embeddings & Models"
+        E1[Model Selection]
+        E2[Backend Evolution]
+        E3[Optimization]
+        E4[Model Evolution]
+    end
+
+    subgraph "Infrastructure"
+        I1[SQLite vs Bleve]
+        I2[Vector DB Selection]
+        I3[Specialization Trade-offs]
+    end
+
+    subgraph "Parsing & Migration"
+        P1[Tree-sitter Chunking]
+        P2[MLX Migration]
+        P3[Observability]
+    end
+
+    R4 --> R1
+    R4 --> R2
+    R1 --> R6
+    R2 --> R6
+    R3 --> R6
+    E1 --> E4
+    E2 --> E3
+
+    style R6 fill:#c8e6c9
+    style R1 fill:#e1f5ff
+    style R2 fill:#e1f5ff
+    style E1 fill:#e1f5ff
+    style E2 fill:#ffe0b2
+    style I1 fill:#e1f5ff
+    style P2 fill:#c8e6c9
+```
+
 ---
 
 ## Available Research

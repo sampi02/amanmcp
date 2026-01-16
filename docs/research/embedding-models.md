@@ -4,7 +4,7 @@
 
 **Date:** 2026-01-14
 **Status:** Current
-**Context:** SPIKE-007 research - finding better embedding models for code search
+**Context:** Research - finding better embedding models for code search
 **Constraint:** Laptop with 24GB RAM, Ollama backend, local-only
 
 ## Executive Summary
@@ -70,6 +70,7 @@ General models like qwen3-embedding-0.6b are trained primarily on natural langua
 ### 1. nomic-embed-code (BEST FOR CODE)
 
 **Why it's the best option:**
+
 - **Purpose-built for code search** - trained specifically on code retrieval tasks
 - Outperforms Voyage Code 3 and OpenAI Embed 3 Large on CodeSearchNet
 - Supports Python, Java, Ruby, PHP, JavaScript, Go
@@ -77,6 +78,7 @@ General models like qwen3-embedding-0.6b are trained primarily on natural langua
 - Apache 2.0 license, fully open source
 
 **Benchmark Scores (CodeSearchNet):**
+
 | Language | Score |
 |----------|-------|
 | Python | 81.7% |
@@ -92,12 +94,14 @@ General models like qwen3-embedding-0.6b are trained primarily on natural langua
 ### 2. jina-embeddings-v2-base-code (BEST LIGHTWEIGHT CODE MODEL)
 
 **Why it's compelling:**
+
 - **Small but code-specialized** (161M params)
 - Trained on 150M+ code Q&A and docstring-source pairs
 - 8K context window with ALiBi extrapolation
 - Leads in 9/15 CodeSearchNet benchmarks for its size class
 
 **Performance:**
+
 - NL2Code: ~86.45% (COIR-CodeSearchNet)
 - Doc2Code: ~96.34%
 - Size: ~307MB (quantized options available)
@@ -109,12 +113,14 @@ General models like qwen3-embedding-0.6b are trained primarily on natural langua
 ### 3. qwen3-embedding:4b (STRONG GENERAL + CODE)
 
 **Why consider upgrading from 0.6b:**
+
 - 4x parameters = significantly better semantic understanding
 - MTEB-Code: ~81% (vs 75.41% for 0.6b)
 - 40K context window
 - Still fits in 24GB RAM comfortably
 
 **Comparison:**
+
 | Metric | 0.6B | 4B | Improvement |
 |--------|------|-----|-------------|
 | MTEB-Code | 75.41% | ~81% | +7.4% |
@@ -129,6 +135,7 @@ General models like qwen3-embedding-0.6b are trained primarily on natural langua
 ### 4. bge-m3 (VERSATILE HYBRID)
 
 **Unique capabilities:**
+
 - Supports dense, sparse, AND multi-vector retrieval
 - 100+ languages
 - 8K context window
@@ -143,6 +150,7 @@ General models like qwen3-embedding-0.6b are trained primarily on natural langua
 ### 5. EmbeddingGemma (EFFICIENT OPTION)
 
 **Why it's interesting:**
+
 - Only 300M parameters but punches above its weight
 - Designed for on-device/edge deployment
 - Matryoshka representation (flexible dimensions 32-768)
@@ -156,6 +164,24 @@ General models like qwen3-embedding-0.6b are trained primarily on natural langua
 
 ## Comparison Matrix
 
+### Model Evolution and Recommendations
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#2563eb','primaryTextColor':'#fff','primaryBorderColor':'#1e40af','lineColor':'#475569','secondaryColor':'#059669','tertiaryColor':'#dc2626'}}}%%
+timeline
+    title Embedding Model Comparison Timeline
+    section Lightweight<br/>< 2GB RAM
+        all-minilm : 46MB · 56% quality<br/>Fastest · Speed-critical only
+        jina-v2-base-code : 307MB · 79% quality<br/>Code-specialized · ✅ Best lightweight
+    section Balanced<br/>2-6GB RAM
+        qwen3-0.6b : 639MB · 75% quality<br/>Current default · Good balance
+        mxbai-embed-large : 670MB · 65% quality<br/>Fast general · Alternative
+        bge-m3 : 1.2GB · 63% quality<br/>Multilingual · Specialized use
+    section High Quality<br/>6-10GB RAM
+        qwen3-4b : 2.5GB · 81% quality<br/>General + code · Upgrade path
+        nomic-embed-code : 7.5GB · 81% quality<br/>Code-specialized · ✅ Best for code
+```
+
 ### Quality vs Resources (Ollama Models)
 
 | Model | Code Quality | RAM Required | Throughput | Best For |
@@ -167,6 +193,55 @@ General models like qwen3-embedding-0.6b are trained primarily on natural langua
 | bge-m3 | Good (63%) | 3-4GB | ~30-40 c/s | Multilingual |
 | mxbai-embed-large | Moderate (65%) | 2-3GB | ~40-50 c/s | Fast general |
 | all-minilm | Basic (56%) | 1GB | ~100+ c/s | Speed-critical |
+
+### Model Quality-to-Resources Tradeoff
+
+```mermaid
+quadrantChart
+    title Model Selection: Code Quality vs RAM Usage
+    x-axis Low RAM --> High RAM
+    y-axis Low Quality --> High Quality
+    quadrant-1 Best Choice
+    quadrant-2 Overkill
+    quadrant-3 Avoid
+    quadrant-4 Budget Option
+    "all-minilm": [0.1, 0.15]
+    "mxbai-embed-large": [0.25, 0.35]
+    "qwen3-0.6b": [0.2, 0.50]
+    "jina-v2-base-code": [0.3, 0.75]
+    "bge-m3": [0.35, 0.40]
+    "qwen3-4b": [0.6, 0.85]
+    "nomic-embed-code": [0.9, 0.90]
+```
+
+### Model Performance Spectrum
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#2563eb','primaryTextColor':'#fff','primaryBorderColor':'#1e40af','lineColor':'#64748b','fontSize':'14px'}}}%%
+graph LR
+    subgraph Lightweight["💡 Lightweight · <2GB RAM"]
+        L1["all-minilm<br/>56% quality · 1GB RAM"] --> L2["Fast but basic<br/>Speed-critical only"]
+        L3["jina-v2-base-code<br/>79% quality · 307MB"] --> L4["✅ Best lightweight<br/>Code-specialized"]
+    end
+
+    subgraph Balanced["⚖️ Balanced · 2-6GB RAM"]
+        B1["qwen3-0.6b<br/>75% quality · 639MB"] --> B2["Current default<br/>Good balance"]
+        B3["mxbai-embed-large<br/>65% quality · 670MB"] --> B4["Fast general<br/>Not code-specific"]
+        B5["bge-m3<br/>63% quality · 1.2GB"] --> B6["Multilingual<br/>Hybrid retrieval"]
+    end
+
+    subgraph HighQuality["🚀 High Quality · 6-10GB RAM"]
+        H1["qwen3-4b<br/>81% quality · 2.5GB"] --> H2["General + code<br/>Upgrade path"]
+        H3["nomic-embed-code<br/>81% quality · 7.5GB"] --> H4["✅ Best for code<br/>Purpose-built"]
+    end
+
+    style L3 fill:#059669,stroke:#047857,stroke-width:3px,color:#fff
+    style L4 fill:#d1fae5,stroke:#047857,stroke-width:2px,color:#065f46
+    style B1 fill:#2563eb,stroke:#1e40af,stroke-width:3px,color:#fff
+    style B2 fill:#dbeafe,stroke:#1e40af,stroke-width:2px,color:#1e3a8a
+    style H3 fill:#059669,stroke:#047857,stroke-width:3px,color:#fff
+    style H4 fill:#d1fae5,stroke:#047857,stroke-width:2px,color:#065f46
+```
 
 ### Expected Improvement Over Current (qwen3-0.6b)
 
@@ -237,6 +312,7 @@ A general model like qwen3-0.6b sees `func (e *Engine) Search` as tokens, while 
 ### Dimension Compatibility
 
 If switching models, the vector index must be rebuilt:
+
 - qwen3-0.6b: 1024 dimensions
 - jina-v2-base-code: 768 dimensions
 - nomic-embed-code: 1024 dimensions (compatible!)
@@ -254,6 +330,7 @@ embedder:
 ### Validation
 
 After switching, re-run Tier 1 validation to measure actual improvement:
+
 ```bash
 # Reindex with new model
 rm -rf .amanmcp/
@@ -298,4 +375,3 @@ For code search specifically, **nomic-embed-code** or **jina-embeddings-v2-base-
 2. Pull and test jina-embeddings-v2-base-code on same queries
 3. Pull and test nomic-embed-code on same queries
 4. Compare results, decide on default model
-5. Update ADR if changing default embedder

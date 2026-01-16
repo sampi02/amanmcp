@@ -1,8 +1,5 @@
 # Vector Search Concepts
 
-**Version:** 1.0.0
-**Last Updated:** 2025-12-28
-
 Learn how vector search enables semantic understanding in AmanMCP.
 
 ---
@@ -72,9 +69,9 @@ flowchart TB
 
     AuthCluster x--x TimeCluster
 
-    style AuthCluster fill:#27ae60,color:#fff
-    style DataCluster fill:#3498db,color:#fff
-    style TimeCluster fill:#9b59b6,color:#fff
+    style AuthCluster fill:#27ae60,stroke-width:2px
+    style DataCluster fill:#3498db,stroke-width:2px
+    style TimeCluster fill:#9b59b6,stroke-width:2px
 ```
 
 Similar documents cluster together.
@@ -82,6 +79,47 @@ Similar documents cluster together.
 ---
 
 ## How Embeddings Work
+
+### Embedding Pipeline
+
+The complete flow from text to stored vector:
+
+```mermaid
+flowchart TB
+    Input["Input Text<br/>'handle user login'"]
+
+    subgraph Tokenization["1. Tokenization"]
+        Token["Split into tokens<br/>['handle', 'user', 'login']<br/>↓<br/>Token IDs: [3847, 1029, 8273]"]
+    end
+
+    subgraph Model["2. Neural Network (Transformer)"]
+        Attention["Attention Mechanism<br/>Find word relationships"]
+        Context["Context Building<br/>'login' relates to 'user'"]
+        Transform["Transform to embedding space"]
+
+        Attention --> Context --> Transform
+    end
+
+    subgraph PostProcess["3. Post-Processing"]
+        Raw["Raw Vector<br/>[0.12, -0.34, 0.56, ..., 0.11]<br/>(768 dimensions)"]
+        Norm["Normalize<br/>Scale to unit length<br/>√(Σ vi²) = 1.0"]
+        Final["Final Embedding<br/>[0.11, -0.31, 0.51, ..., 0.10]"]
+
+        Raw --> Norm --> Final
+    end
+
+    subgraph Storage["4. Storage"]
+        Index["Vector Index (HNSW)<br/>Store with ID for retrieval"]
+    end
+
+    Input --> Tokenization --> Model --> PostProcess --> Storage
+
+    style Input fill:#3498db,stroke-width:2px
+    style Tokenization fill:#9b59b6,stroke-width:2px
+    style Model fill:#e67e22,stroke-width:2px
+    style PostProcess fill:#f39c12,stroke-width:2px
+    style Storage fill:#27ae60,stroke-width:2px
+```
 
 ### Neural Network Magic
 
@@ -198,6 +236,56 @@ Total: 76.8 million multiplications + sort
 Time: ~100ms per query (too slow)
 ```
 
+### Brute Force vs Approximate Search
+
+The fundamental trade-off in vector search:
+
+```mermaid
+flowchart TB
+    subgraph BruteForce["Brute Force Search (Exact)"]
+        direction TB
+        BF_Input["Query Vector"]
+        BF_Comp["Compare with ALL vectors<br/>O(n) complexity"]
+        BF_Sort["Sort all results"]
+        BF_Top["Return top-k"]
+        BF_Result["Results"]
+
+        BF_Input --> BF_Comp --> BF_Sort --> BF_Top --> BF_Result
+
+        BF_Metrics["<br/>100K docs: 100,000 comparisons<br/>1M docs: 1,000,000 comparisons<br/><br/>Accuracy: 100%<br/>Speed: Slow (100ms+)<br/>Memory: Low"]
+    end
+
+    subgraph ApproxSearch["Approximate Search (HNSW)"]
+        direction TB
+        AS_Input["Query Vector"]
+        AS_Nav["Navigate graph layers<br/>O(log n) complexity"]
+        AS_Local["Local exhaustive search<br/>in candidate set"]
+        AS_Top["Return top-k"]
+        AS_Result["Results"]
+
+        AS_Input --> AS_Nav --> AS_Local --> AS_Top --> AS_Result
+
+        AS_Metrics["<br/>100K docs: ~60 comparisons<br/>1M docs: ~70 comparisons<br/><br/>Accuracy: 95-99%<br/>Speed: Fast (1-5ms)<br/>Memory: Higher (graph structure)"]
+    end
+
+    Comparison["<b>Key Insight:</b><br/>Miss 1-5% of perfect results<br/>Gain 20-100x speedup<br/><br/>For code search: acceptable trade-off"]
+
+    BruteForce -.->|"vs"| ApproxSearch
+    BruteForce --> Comparison
+    ApproxSearch --> Comparison
+
+    style BruteForce fill:#e74c3c,stroke-width:2px
+    style BruteForce color:#FFFFFF
+    style ApproxSearch fill:#27ae60,stroke-width:2px
+    style ApproxSearch color:#FFFFFF
+    style Comparison fill:#3498db,stroke-width:2px
+    style Comparison color:#FFFFFF
+    style BF_Comp fill:#c0392b,stroke-width:2px
+    style BF_Comp color:#FFFFFF
+    style AS_Nav fill:#229954,stroke-width:2px
+    style AS_Nav color:#FFFFFF
+```
+
 ### We Need Approximate Search
 
 Trade accuracy for speed:
@@ -239,9 +327,13 @@ flowchart TB
     C1 --> C0
     D1 --> D0
 
-    style L2 fill:#e74c3c,color:#fff
-    style L1 fill:#f39c12,color:#fff
-    style L0 fill:#27ae60,color:#fff
+    style L2 fill:#e74c3c,stroke-width:2px
+    style L1 fill:#f39c12,stroke-width:2px
+    style L0 fill:#27ae60,stroke-width:2px
+    
+    style L2 color:#FFFFFF
+    style L1 color:#FFFFFF
+    style L0 color:#FFFFFF
 ```
 
 ### Search Algorithm
@@ -270,6 +362,87 @@ sequenceDiagram
 
     Q->>R: Return I
 ```
+
+### Detailed HNSW Search Navigation
+
+Step-by-step visualization of how HNSW navigates layers to find nearest neighbors:
+
+```mermaid
+---
+config:
+  layout: elk
+---
+flowchart TB
+    Start([Query Vector Q]) --> EntryPoint["Layer 2 (Top)<br/>Entry point: Node A"]
+
+    EntryPoint --> L2Check["Check A's neighbors in Layer 2<br/>Neighbors: [D]<br/>Distance(Q,A)=0.8<br/>Distance(Q,D)=0.3"]
+
+    L2Check --> L2Better{Found<br/>closer node?}
+    L2Better -->|Yes: D is closer| L2Move["Move to D<br/>New best: D (0.3)"]
+    L2Move --> L2Recheck["Check D's neighbors<br/>No closer nodes found"]
+
+    L2Recheck --> L2Done["Layer 2 complete<br/>Best node: D"]
+
+    L2Done --> DropL1["Drop to Layer 1<br/>Start from D"]
+
+    DropL1 --> L1Check["Check D's neighbors in Layer 1<br/>Neighbors: [A, B, C]<br/>Distance(Q,A)=0.8<br/>Distance(Q,B)=0.5<br/>Distance(Q,C)=0.2"]
+
+    L1Check --> L1Better{Found<br/>closer node?}
+    L1Better -->|Yes: C is closer| L1Move["Move to C<br/>New best: C (0.2)"]
+    L1Move --> L1Recheck["Check C's neighbors<br/>No closer nodes found"]
+
+    L1Recheck --> L1Done["Layer 1 complete<br/>Best node: C"]
+
+    L1Done --> DropL0["Drop to Layer 0<br/>Start from C"]
+
+    DropL0 --> L0Search["Exhaustive local search in Layer 0<br/>Check C's neighbors: [B, D, F, J]<br/>Distance(Q,B)=0.5<br/>Distance(Q,D)=0.3<br/>Distance(Q,F)=0.15<br/>Distance(Q,J)=0.4"]
+
+    L0Search --> L0Better{Found<br/>closer node?}
+    L0Better -->|Yes: F is closer| L0Move["Move to F<br/>New best: F (0.15)"]
+
+    L0Move --> L0Expand["Check F's neighbors: [C, E, I]<br/>Distance(Q,C)=0.2<br/>Distance(Q,E)=0.25<br/>Distance(Q,I)=0.08"]
+
+    L0Expand --> L0Best{Found<br/>closer node?}
+    L0Best -->|Yes: I is closer| L0Final["Move to I<br/>New best: I (0.08)"]
+
+    L0Final --> L0Check["Check I's neighbors<br/>No closer nodes found"]
+
+    L0Check --> Complete["Search complete<br/>Nearest neighbor: I<br/>Distance: 0.08"]
+
+    Complete --> Stats["
+    Performance:
+    • Layer 2: 2 comparisons
+    • Layer 1: 4 comparisons
+    • Layer 0: 8 comparisons
+    • Total: 14 comparisons
+    • vs Brute force: 10,000 comparisons
+    • Speedup: 714x
+    "]
+
+    style Start fill:#3498db,stroke-width:2px
+    style EntryPoint fill:#e74c3c,stroke-width:2px
+    style L2Done fill:#f39c12,stroke-width:2px
+    style L1Done fill:#f39c12,stroke-width:2px
+    style L0Final fill:#27ae60,stroke-width:2px
+    style Complete fill:#27ae60,stroke-width:2px
+    style Stats fill:#e1f5ff
+    style L2Move fill:#ffe0b2
+    style L1Move fill:#ffe0b2
+    style L0Move fill:#c8e6c9
+    style L2Better fill:#fff9c4
+    style L1Better fill:#fff9c4
+    style L0Better fill:#fff9c4
+    style L0Best fill:#fff9c4
+```
+
+**Key Algorithm Steps:**
+
+1. **Start at top layer** (Layer 2): Fewest nodes, longest jumps
+2. **Greedy search**: Move to closer neighbors until stuck
+3. **Drop down**: Descend to next layer at current best node
+4. **Repeat**: Greedy search at each layer
+5. **Bottom layer**: Exhaustive local search for precision
+6. **Result**: Near-optimal with logarithmic comparisons
 
 ### Why It's Fast
 
@@ -414,10 +587,10 @@ flowchart TB
 
     Source --> Chunker --> Embedder --> Index
 
-    style Source fill:#3498db,color:#fff
-    style Chunker fill:#9b59b6,color:#fff
-    style Embedder fill:#e67e22,color:#fff
-    style Index fill:#27ae60,color:#fff
+    style Source fill:#3498db,stroke-width:2px,color:#fff
+    style Chunker fill:#9b59b6,stroke-width:2px,color:#fff
+    style Embedder fill:#e67e22,stroke-width:2px,color:#fff
+    style Index fill:#27ae60,stroke-width:2px,color:#fff
 ```
 
 ### Batching for Speed
@@ -463,11 +636,11 @@ flowchart TB
 
     Query --> Embed --> HNSW --> Rerank --> Return
 
-    style Query fill:#3498db,color:#fff
-    style Embed fill:#9b59b6,color:#fff
-    style HNSW fill:#e67e22,color:#fff
-    style Rerank fill:#f39c12,color:#fff
-    style Return fill:#27ae60,color:#fff
+    style Query fill:#3498db,stroke-width:2px
+    style Embed fill:#9b59b6,stroke-width:2px
+    style HNSW fill:#e67e22,stroke-width:2px
+    style Rerank fill:#f39c12,stroke-width:2px
+    style Return fill:#27ae60,stroke-width:2px
 ```
 
 ### Code Example
