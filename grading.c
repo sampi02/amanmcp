@@ -15,6 +15,7 @@ void main()
     printf("Enter your marks ");
     scanf("%d",&marks[i]);
     }
+        printf("The student %d grade is: "\n);
     for(i=0;i<n;i++)
     {
     if(marks[i]<0 || marks[i]>100)
